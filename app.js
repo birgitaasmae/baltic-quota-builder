@@ -200,7 +200,7 @@ async function fetchLatviaPopulation(year, minAge, maxAge) {
 
 async function fetchLithuaniaPopulation(year) {
   const url = `${LITHUANIA_SDMX_BASE},${LITHUANIA_FLOW_ID}/.?startPeriod=${year}&endPeriod=${year}`;
-  const response = await fetch(url);
+  const response = await fetch(url, { credentials: "include" });
   if (!response.ok) throw new Error(`Lithuania OSP returned ${response.status}`);
   const xml = new DOMParser().parseFromString(await response.text(), "application/xml");
   const national = new Map();
