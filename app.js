@@ -254,20 +254,27 @@ async function fetchLithuaniaPopulation(year) {
   }
   const data = await response.json();
   const national = new Map();
+  const regional = new Map();
+  const labels = {};
 
   for (const row of data.rows) {
     const perAge = row.population / (row.ageTo - row.ageFrom + 1);
     for (let age = row.ageFrom; age <= row.ageTo; age++) {
-      national.set(`${row.sex}|${age}`, (national.get(`${row.sex}|${age}`) || 0) + perAge);
+      if (row.regionCode === "00") {
+        national.set(`${row.sex}|${age}`, (national.get(`${row.sex}|${age}`) || 0) + perAge);
+      } else if (row.regionCode) {
+        regional.set(`${row.sex}|${age}|${row.regionCode}`, (regional.get(`${row.sex}|${age}|${row.regionCode}`) || 0) + perAge);
+        labels[row.regionCode] = row.regionLabel || row.regionCode;
+      }
     }
   }
 
   return {
     national,
-    regional: new Map(),
-    labels: {},
-    nationalRegionCode: null,
-    sourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R167_M3010222. Lithuania is published in 5-year age bands, so partial age ranges are prorated within bands."
+    regional,
+    labels,
+    nationalRegionCode: "00",
+    sourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R167_M3010202"
   };
 }
 

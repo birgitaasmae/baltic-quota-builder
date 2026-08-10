@@ -39,7 +39,7 @@ The app will then be available from:
 - `api/lithuania-population.js` - serverless proxy for Lithuania OSP SDMX data
 - Estonia: Statistics Estonia table `RV0240`
 - Latvia: Central Statistics Bureau API v2 table `IRD041`
-- Lithuania: State Data Agency / Official Statistics Portal SDMX flow `S3R167_M3010222`
+- Lithuania: State Data Agency / Official Statistics Portal SDMX flow `S3R167_M3010202`
 
 ## Backend Proxy
 

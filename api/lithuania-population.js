@@ -1,25 +1,18 @@
-const FLOW_ID = "S3R167_M3010222";
+const FLOW_ID = "S3R167_M3010202";
 const SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${FLOW_ID}/.`;
 
-const AGE_BANDS = new Map([
-  ["g000g004", [0, 4]],
-  ["g005g009", [5, 9]],
-  ["g010g014", [10, 14]],
-  ["g015g019", [15, 19]],
-  ["g020g024", [20, 24]],
-  ["g025g029", [25, 29]],
-  ["g030g034", [30, 34]],
-  ["g035g039", [35, 39]],
-  ["g040g044", [40, 44]],
-  ["g045g049", [45, 49]],
-  ["g050g054", [50, 54]],
-  ["g055g059", [55, 59]],
-  ["g060g064", [60, 64]],
-  ["g065g069", [65, 69]],
-  ["g070g074", [70, 74]],
-  ["g075g079", [75, 79]],
-  ["g080g084", [80, 84]],
-  ["g085", [85, 99]]
+const NATIONAL_REGION_CODE = "00";
+const COUNTY_LABELS = new Map([
+  ["01", "Alytus county"],
+  ["02", "Kaunas county"],
+  ["03", "Klaipeda county"],
+  ["04", "Marijampole county"],
+  ["05", "Panevezys county"],
+  ["06", "Siauliai county"],
+  ["07", "Taurage county"],
+  ["08", "Telsiai county"],
+  ["09", "Utena county"],
+  ["10", "Vilnius county"]
 ]);
 
 function readKeyValue(block, id) {
@@ -35,23 +28,26 @@ function parseLithuaniaXml(xml, year) {
 
   while ((match = obsPattern.exec(xml)) !== null) {
     const keyBlock = match[1];
-    if (readKeyValue(keyBlock, "salisM301022") !== "TOT_gimimo") continue;
-    if (readKeyValue(keyBlock, "indeksas_M3010216") !== "0") continue;
     if (readKeyValue(keyBlock, "MATVNT") !== "asmenys") continue;
     if (readKeyValue(keyBlock, "LAIKOTARPIS") !== year) continue;
 
     const sexCode = readKeyValue(keyBlock, "Lytis");
-    const ageCode = readKeyValue(keyBlock, "Demogr_amziaus_grM1412");
-    const range = AGE_BANDS.get(ageCode);
+    const ageCode = readKeyValue(keyBlock, "Demogr_amziusM1411");
+    const regionCode = readKeyValue(keyBlock, "savivaldybesRegdb");
+    const age = ageCode === "g085" ? 85 : Number(ageCode);
     const population = Number(match[2]);
 
-    if (!range || !Number.isFinite(population) || population <= 0) continue;
+    if (!Number.isInteger(age) || age < 0 || age > 85) continue;
     if (sexCode !== "1" && sexCode !== "2") continue;
+    if (regionCode !== NATIONAL_REGION_CODE && !COUNTY_LABELS.has(regionCode)) continue;
+    if (!Number.isFinite(population) || population <= 0) continue;
 
     rows.push({
       sex: sexCode === "1" ? "M" : "F",
-      ageFrom: range[0],
-      ageTo: range[1],
+      ageFrom: age,
+      ageTo: ageCode === "g085" ? 99 : age,
+      regionCode,
+      regionLabel: regionCode === NATIONAL_REGION_CODE ? "Republic of Lithuania" : COUNTY_LABELS.get(regionCode),
       population
     });
   }
@@ -94,6 +90,7 @@ export default async function handler(request, response) {
     response.status(200).json({
       source: "State Data Agency of Lithuania / Official Statistics Portal",
       flow: FLOW_ID,
+      regionalLevel: "counties",
       year,
       rows
     });
