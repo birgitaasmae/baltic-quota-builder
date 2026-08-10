@@ -3,16 +3,16 @@ const SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${FLOW_ID}/.`;
 
 const NATIONAL_REGION_CODE = "00";
 const COUNTY_LABELS = new Map([
-  ["01", "Alytus county"],
-  ["02", "Kaunas county"],
-  ["03", "Klaipeda county"],
-  ["04", "Marijampole county"],
-  ["05", "Panevezys county"],
-  ["06", "Siauliai county"],
-  ["07", "Taurage county"],
-  ["08", "Telsiai county"],
-  ["09", "Utena county"],
-  ["10", "Vilnius county"]
+  ["10", "Vilnius region"],
+  ["02", "Kaunas region"],
+  ["03", "Klaipėda region"],
+  ["06", "Šiauliai region"],
+  ["05", "Panevėžys region"],
+  ["01", "Alytus region"],
+  ["04", "Marijampolė region"],
+  ["09", "Utena region"],
+  ["08", "Telšiai region"],
+  ["07", "Tauragė region"]
 ]);
 
 function readKeyValue(block, id) {

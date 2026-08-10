@@ -22,6 +22,18 @@ const LATVIA_REGION_CODES = [
   "LV00A", "LV00C", "LV00B", "LV009", "LV005"
 ];
 
+const LATVIA_REGION_LABELS = {
+  LV00A: "Rīgas statistiskais reģions",
+  LV00C: "Vidzemes statistiskais reģions",
+  LV00B: "Kurzemes statistiskais reģions",
+  LV009: "Zemgales statistiskais reģions",
+  LV005: "Latgales statistiskais reģions"
+};
+
+const LITHUANIA_REGION_CODES = [
+  "10", "02", "03", "06", "05", "01", "04", "09", "08", "07"
+];
+
 const state = {
   rowsForExport: [],
   latestPopulationData: null,
@@ -198,6 +210,7 @@ async function fetchEstoniaPopulation(year, minAge, maxAge) {
     national,
     regional,
     labels,
+    regionOrder: ESTONIA_REGION_CODES,
     nationalRegionCode: "00",
     sourceNote: "Statistics Estonia table RV0240"
   };
@@ -218,7 +231,7 @@ async function fetchLatviaPopulation(year, minAge, maxAge) {
   const parsed = parseJsonStat(data);
   const national = new Map();
   const regional = new Map();
-  const labels = parsed.dimLabels.AREA || {};
+  const labels = { ...(parsed.dimLabels.AREA || {}), ...LATVIA_REGION_LABELS };
 
   for (const area of areaCodes) {
     for (const sex of ["M", "F"]) {
@@ -241,6 +254,7 @@ async function fetchLatviaPopulation(year, minAge, maxAge) {
     national,
     regional,
     labels,
+    regionOrder: LATVIA_REGION_CODES,
     nationalRegionCode: "LV",
     sourceNote: "Central Statistics Bureau of Latvia table IRD041"
   };
@@ -273,6 +287,7 @@ async function fetchLithuaniaPopulation(year) {
     national,
     regional,
     labels,
+    regionOrder: LITHUANIA_REGION_CODES,
     nationalRegionCode: "00",
     sourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R167_M3010202"
   };
@@ -401,7 +416,8 @@ async function buildQuotas() {
     addExportRows("Age Distribution", ["Age Group", "Population", "%", "Quota"], ageRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
 
     if (regionLevel > 0 && population.regional.size) {
-      const regionCodes = Object.keys(population.labels).filter(code => code !== population.nationalRegionCode);
+      const regionCodes = (population.regionOrder || Object.keys(population.labels))
+        .filter(code => code !== population.nationalRegionCode);
       const regionPopulations = regionCodes.map(code => aggregateRegional(population.regional, sexes, ageBands, code));
       const nonZero = regionCodes
         .map((code, index) => ({ code, population: regionPopulations[index] }))
