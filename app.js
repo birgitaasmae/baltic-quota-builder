@@ -1,14 +1,25 @@
-const API_BASE = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/";
+const LATVIA_API_BASE = "https://api.stat.gov.lv/api/v2";
+const LITHUANIA_SDMX_BASE = "https://osp-rs.stat.gov.lt/rest_xml/data/LSD";
 
 const COUNTRY_NAMES = {
   LV: "Latvia",
   LT: "Lithuania"
 };
 
-const AGE_BANDS_5 = [
-  "Y_LT5", "Y5-9", "Y10-14", "Y15-19", "Y20-24", "Y25-29", "Y30-34",
-  "Y35-39", "Y40-44", "Y45-49", "Y50-54", "Y55-59", "Y60-64",
-  "Y65-69", "Y70-74", "Y75-79", "Y80-84", "Y85-89", "Y_GE90"
+const LATVIA_TABLE_ID = "IRD041";
+const LITHUANIA_FLOW_ID = "S3R167_M3010222";
+
+const LATVIA_REGION_CODES = [
+  "LV00A", "LV00C", "LV00B", "LV009", "LV005"
+];
+
+const LITHUANIA_AGE_BANDS = [
+  ["g000g004", 0, 4], ["g005g009", 5, 9], ["g010g014", 10, 14],
+  ["g015g019", 15, 19], ["g020g024", 20, 24], ["g025g029", 25, 29],
+  ["g030g034", 30, 34], ["g035g039", 35, 39], ["g040g044", 40, 44],
+  ["g045g049", 45, 49], ["g050g054", 50, 54], ["g055g059", 55, 59],
+  ["g060g064", 60, 64], ["g065g069", 65, 69], ["g070g074", 70, 74],
+  ["g075g079", 75, 79], ["g080g084", 80, 84], ["g085", 85, 99]
 ];
 
 const state = {
@@ -48,21 +59,13 @@ const els = {
   download: document.querySelector("#downloadButton")
 };
 
-function buildApiUrl(dataset, params) {
-  const parts = ["format=JSON", "lang=en"];
-  for (const [key, value] of Object.entries(params)) {
-    if (Array.isArray(value)) {
-      for (const item of value) parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(item)}`);
-    } else {
-      parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
-    }
-  }
-  return `${API_BASE}${dataset}?${parts.join("&")}`;
-}
-
-async function apiFetch(dataset, params) {
-  const response = await fetch(buildApiUrl(dataset, params));
-  if (!response.ok) throw new Error(`Eurostat returned ${response.status}`);
+async function latviaPostSelection(tableId, selection) {
+  const response = await fetch(`${LATVIA_API_BASE}/tables/${tableId}/data?lang=en&outputFormat=json-stat2`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selection })
+  });
+  if (!response.ok) throw new Error(`Latvia CSB returned ${response.status}`);
   return response.json();
 }
 
@@ -97,17 +100,7 @@ function lookupValue(parsed, coords) {
 }
 
 function exactAgeCode(age) {
-  return age === 0 ? "Y_LT1" : `Y${age}`;
-}
-
-function bandRange(code) {
-  if (code === "Y_LT1") return [0, 0];
-  if (code === "Y_LT5") return [0, 4];
-  if (code === "Y_GE90") return [90, 99];
-  const match = code.match(/^Y(\d+)-(\d+)$/);
-  if (match) return [Number(match[1]), Number(match[2])];
-  const single = code.match(/^Y(\d+)$/);
-  return single ? [Number(single[1]), Number(single[1])] : null;
+  return `Y${age}`;
 }
 
 function getAgeBands(minAge, maxAge, grouping) {
@@ -130,18 +123,6 @@ function getAgeBands(minAge, maxAge, grouping) {
     });
   }
   return bands;
-}
-
-function getRegionalBands(minAge, maxAge) {
-  return AGE_BANDS_5.map(code => {
-    const [from, to] = bandRange(code);
-    return { code, from, to, label: humanAgeBand(code) };
-  }).filter(band => band.to >= minAge && band.from <= maxAge);
-}
-
-function humanAgeBand(code) {
-  const range = bandRange(code);
-  return range ? `${range[0]}-${range[1]}` : code.replace(/^Y/, "");
 }
 
 function fmt(number) {
@@ -179,73 +160,89 @@ function largestRemainder(proportions, total) {
   return floors;
 }
 
-async function fetchNationalPopulation(country, year) {
+async function fetchLatviaPopulation(year, minAge, maxAge) {
   const ageCodes = [];
-  for (let age = 0; age <= 99; age++) ageCodes.push(exactAgeCode(age));
+  for (let age = minAge; age <= maxAge; age++) ageCodes.push(exactAgeCode(age));
+  const areaCodes = ["LV", ...LATVIA_REGION_CODES];
 
-  const data = await apiFetch("demo_pjan", {
-    sex: ["M", "F"],
-    age: ageCodes,
-    geo: country,
-    unit: "NR",
-    time: year
-  });
+  const data = await latviaPostSelection(LATVIA_TABLE_ID, [
+    { variableCode: "ContentsCode", valueCodes: [LATVIA_TABLE_ID] },
+    { variableCode: "TIME", valueCodes: [year] },
+    { variableCode: "AREA", valueCodes: areaCodes },
+    { variableCode: "SEX", valueCodes: ["M", "F"] },
+    { variableCode: "AGE", valueCodes: ageCodes }
+  ]);
   const parsed = parseJsonStat(data);
-  const result = new Map();
+  const national = new Map();
+  const regional = new Map();
+  const labels = parsed.dimLabels.AREA || {};
 
-  for (const sex of ["M", "F"]) {
-    for (let age = 0; age <= 99; age++) {
-      const value = lookupValue(parsed, {
-        freq: "A",
-        unit: "NR",
-        sex,
-        age: exactAgeCode(age),
-        geo: country,
-        time: year
-      });
-      if (value > 0) result.set(`${sex}|${age}`, value);
-    }
-  }
-  return result;
-}
-
-async function fetchRegionalPopulation(country, year, level) {
-  if (level === 0) return { labels: {}, data: new Map() };
-  const geoLength = 2 + level;
-  const catalogData = await apiFetch("demo_r_pjangrp3", {
-    sex: "T",
-    age: "TOTAL",
-    unit: "NR",
-    time: year
-  });
-  const catalog = parseJsonStat(catalogData).dimLabels.geo || {};
-  const geos = Object.keys(catalog).filter(code =>
-    code.startsWith(country) && code.length === geoLength && !/\(NUTS\s/.test(catalog[code])
-  );
-  const labels = {};
-  for (const geo of geos) labels[geo] = catalog[geo] || geo;
-
-  if (!geos.length) return { labels, data: new Map() };
-
-  const data = await apiFetch("demo_r_pjangrp3", {
-    sex: ["M", "F"],
-    age: AGE_BANDS_5,
-    geo: geos,
-    unit: "NR",
-    time: year
-  });
-  const parsed = parseJsonStat(data);
-  const result = new Map();
-  for (const geo of geos) {
+  for (const area of areaCodes) {
     for (const sex of ["M", "F"]) {
-      for (const age of AGE_BANDS_5) {
-        const value = lookupValue(parsed, { freq: "A", unit: "NR", sex, age, geo, time: year });
-        if (value > 0) result.set(`${sex}|${age}|${geo}`, value);
+      for (let age = minAge; age <= maxAge; age++) {
+      const value = lookupValue(parsed, {
+        AREA: area,
+        AGE: exactAgeCode(age),
+        sex,
+        SEX: sex,
+        ContentsCode: LATVIA_TABLE_ID,
+        TIME: year
+      });
+      if (value > 0) {
+        if (area === "LV") national.set(`${sex}|${age}`, value);
+        else regional.set(`${sex}|${age}|${area}`, value);
+      }
       }
     }
   }
+  return { national, regional, labels, sourceNote: "Central Statistics Bureau of Latvia table IRD041" };
+}
 
-  return { labels, data: result };
+async function fetchLithuaniaPopulation(year) {
+  const url = `${LITHUANIA_SDMX_BASE},${LITHUANIA_FLOW_ID}/.?startPeriod=${year}&endPeriod=${year}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Lithuania OSP returned ${response.status}`);
+  const xml = new DOMParser().parseFromString(await response.text(), "application/xml");
+  const national = new Map();
+
+  for (const obs of Array.from(xml.getElementsByTagNameNS("*", "Obs"))) {
+    const key = {};
+    for (const value of Array.from(obs.getElementsByTagNameNS("*", "Value"))) {
+      const id = value.getAttribute("id");
+      if (id) key[id] = value.getAttribute("value");
+    }
+    if (key.salisM301022 !== "TOT_gimimo") continue;
+    if (key.indeksas_M3010216 !== "0") continue;
+    if (key.MATVNT !== "asmenys") continue;
+    if (key.LAIKOTARPIS !== year) continue;
+    if (!["1", "2"].includes(key.Lytis)) continue;
+
+    const ageBand = LITHUANIA_AGE_BANDS.find(([code]) => code === key.Demogr_amziaus_grM1412);
+    if (!ageBand) continue;
+
+    const rawValue = obs.getElementsByTagNameNS("*", "ObsValue")[0]?.getAttribute("value");
+    const total = Number(rawValue);
+    if (!Number.isFinite(total) || total <= 0) continue;
+
+    const sex = key.Lytis === "1" ? "M" : "F";
+    const [, from, to] = ageBand;
+    const perAge = total / (to - from + 1);
+    for (let age = from; age <= to; age++) {
+      national.set(`${sex}|${age}`, (national.get(`${sex}|${age}`) || 0) + perAge);
+      }
+  }
+
+  return {
+    national,
+    regional: new Map(),
+    labels: {},
+    sourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R167_M3010222. Lithuania is published in 5-year age bands, so partial age ranges are prorated within bands."
+  };
+}
+
+async function fetchPopulation(country, year, minAge, maxAge) {
+  if (country === "LV") return fetchLatviaPopulation(year, minAge, maxAge);
+  return fetchLithuaniaPopulation(year);
 }
 
 function aggregateNational(map, sexes, bands) {
@@ -267,13 +264,11 @@ function aggregateRegional(map, sexes, bands, geo = null) {
   let total = 0;
   for (const sex of sexes) {
     for (const band of bands) {
-      for (const [key, value] of map.entries()) {
-        const [keySex, keyAge, keyGeo] = key.split("|");
-        if (keySex !== sex) continue;
-        if (geo && keyGeo !== geo) continue;
-        const range = bandRange(keyAge);
-        if (!range) continue;
-        if (range[1] >= band.from && range[0] <= band.to) total += value;
+      const members = band.members || [band];
+      for (const member of members) {
+        for (let age = member.from; age <= member.to; age++) {
+          total += map.get(`${sex}|${age}|${geo}`) || 0;
+        }
       }
     }
   }
@@ -349,8 +344,11 @@ async function buildQuotas() {
 
   try {
     const ageBands = getAgeBands(minAge, maxAge, grouping);
-    const national = await fetchNationalPopulation(country, year);
+    const population = await fetchPopulation(country, year, minAge, maxAge);
+    const national = population.national;
     state.latestPopulationData = national;
+    state.latestRegionalData = population.regional;
+    state.latestGeoLabels = population.labels;
     const totalPopulation = aggregateNational(national, sexes, ageBands);
     if (!totalPopulation) throw new Error("No population data found for this selection.");
 
@@ -370,16 +368,12 @@ async function buildQuotas() {
     const agePopulations = ageBands.map(band => aggregateNational(national, sexes, [band]));
     const ageRows = buildQuotaRows(ageLabels, agePopulations, sampleSize);
     renderTable(els.ageTable, ["Age Group", "Population", "%", "Quota"], ageRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
-    els.ageMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Ages ${minAge}-${maxAge}; ${grouping}-year display grouping.`;
+    els.ageMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Ages ${minAge}-${maxAge}; ${grouping}-year display grouping. Source: ${population.sourceNote}.`;
     addExportRows("Age Distribution", ["Age Group", "Population", "%", "Quota"], ageRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
 
-    if (regionLevel > 0) {
-      const regionalBands = getRegionalBands(minAge, maxAge);
-      const regional = await fetchRegionalPopulation(country, year, regionLevel);
-      state.latestRegionalData = regional.data;
-      state.latestGeoLabels = regional.labels;
-      const regionCodes = Object.keys(regional.labels);
-      const regionPopulations = regionCodes.map(code => aggregateRegional(regional.data, sexes, regionalBands, code));
+    if (regionLevel > 0 && population.regional.size) {
+      const regionCodes = Object.keys(population.labels).filter(code => code !== "LV");
+      const regionPopulations = regionCodes.map(code => aggregateRegional(population.regional, sexes, ageBands, code));
       const nonZero = regionCodes
         .map((code, index) => ({ code, population: regionPopulations[index] }))
         .filter(row => row.population > 0);
@@ -420,7 +414,7 @@ async function buildQuotas() {
     els.results.hidden = false;
     els.copy.disabled = false;
     els.download.disabled = false;
-    els.status.textContent = `Built quotas for ${COUNTRY_NAMES[country]} from Eurostat population data.`;
+    els.status.textContent = `Built quotas for ${COUNTRY_NAMES[country]} from local statistics bureau data.`;
   } catch (error) {
     els.status.textContent = error.message;
   } finally {
