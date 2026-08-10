@@ -1,18 +1,20 @@
 const FLOW_ID = "S3R167_M3010202";
 const SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${FLOW_ID}/.`;
+const NATIONALITY_FLOW_ID = "S3R167_M3010215_1";
+const NATIONALITY_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${NATIONALITY_FLOW_ID}/.`;
 
 const NATIONAL_REGION_CODE = "00";
 const COUNTY_LABELS = new Map([
   ["10", "Vilnius region"],
   ["02", "Kaunas region"],
-  ["03", "Klaipėda region"],
-  ["06", "Šiauliai region"],
-  ["05", "Panevėžys region"],
+  ["03", "Klaip\u0117da region"],
+  ["06", "\u0160iauliai region"],
+  ["05", "Panev\u0117\u017eys region"],
   ["01", "Alytus region"],
-  ["04", "Marijampolė region"],
+  ["04", "Marijampol\u0117 region"],
   ["09", "Utena region"],
-  ["08", "Telšiai region"],
-  ["07", "Tauragė region"]
+  ["08", "Tel\u0161iai region"],
+  ["07", "Taurag\u0117 region"]
 ]);
 
 function readKeyValue(block, id) {
@@ -55,6 +57,34 @@ function parseLithuaniaXml(xml, year) {
   return rows;
 }
 
+function parseLithuaniaNationalityXml(xml, year) {
+  let total = 0;
+  let lithuanian = 0;
+  let russian = 0;
+  const obsPattern = /<g:Obs><g:ObsKey>([\s\S]*?)<\/g:ObsKey><g:ObsValue value="([^"]*)"/g;
+  let match;
+
+  while ((match = obsPattern.exec(xml)) !== null) {
+    const keyBlock = match[1];
+    if (readKeyValue(keyBlock, "MATVNT") !== "asmenys") continue;
+    if (readKeyValue(keyBlock, "LAIKOTARPIS") !== year) continue;
+
+    const code = readKeyValue(keyBlock, "tautybeM3010215");
+    const population = Number(match[2]);
+    if (!Number.isFinite(population) || population <= 0) continue;
+
+    if (code === "TOT") total = population;
+    if (code === "Lietuvis") lithuanian = population;
+    if (code === "Rusas") russian = population;
+  }
+
+  return [
+    { label: "Lithuanian", population: lithuanian },
+    { label: "Russian", population: russian },
+    { label: "Other", population: Math.max(0, total - lithuanian - russian) }
+  ];
+}
+
 export default async function handler(request, response) {
   const year = String(request.query.year || "2024");
 
@@ -74,14 +104,23 @@ export default async function handler(request, response) {
   }
 
   try {
-    const sourceResponse = await fetch(`${SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`);
+    const [sourceResponse, nationalityResponse] = await Promise.all([
+      fetch(`${SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`),
+      fetch(`${NATIONALITY_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`)
+    ]);
     if (!sourceResponse.ok) {
       response.status(sourceResponse.status).json({ error: `Lithuania OSP returned ${sourceResponse.status}` });
       return;
     }
+    if (!nationalityResponse.ok) {
+      response.status(nationalityResponse.status).json({ error: `Lithuania OSP nationality flow returned ${nationalityResponse.status}` });
+      return;
+    }
 
     const xml = await sourceResponse.text();
+    const nationalityXml = await nationalityResponse.text();
     const rows = parseLithuaniaXml(xml, year);
+    const nationalityRows = parseLithuaniaNationalityXml(nationalityXml, year);
     if (!rows.length) {
       response.status(404).json({ error: "No Lithuania population rows found for this year" });
       return;
@@ -90,9 +129,11 @@ export default async function handler(request, response) {
     response.status(200).json({
       source: "State Data Agency of Lithuania / Official Statistics Portal",
       flow: FLOW_ID,
+      nationalityFlow: NATIONALITY_FLOW_ID,
       regionalLevel: "counties",
       year,
-      rows
+      rows,
+      nationalityRows
     });
   } catch (error) {
     response.status(502).json({ error: error.message });

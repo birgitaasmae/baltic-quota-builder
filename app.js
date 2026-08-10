@@ -11,7 +11,9 @@ const COUNTRY_NAMES = {
 };
 
 const ESTONIA_TABLE_ID = "RV0240";
+const ESTONIA_NATIONALITY_TABLE_ID = "RV022U";
 const LATVIA_TABLE_ID = "IRD041";
+const LATVIA_NATIONALITY_TABLE_ID = "IRE010";
 const LITHUANIA_FLOW_ID = "S3R167_M3010202";
 
 const ESTONIA_REGION_CODES = [
@@ -23,11 +25,11 @@ const LATVIA_REGION_CODES = [
 ];
 
 const LATVIA_REGION_LABELS = {
-  LV00A: "Rīgas statistiskais reģions",
-  LV00C: "Vidzemes statistiskais reģions",
-  LV00B: "Kurzemes statistiskais reģions",
-  LV009: "Zemgales statistiskais reģions",
-  LV005: "Latgales statistiskais reģions"
+  LV00A: "R\u012bgas statistiskais re\u0123ions",
+  LV00C: "Vidzemes statistiskais re\u0123ions",
+  LV00B: "Kurzemes statistiskais re\u0123ions",
+  LV009: "Zemgales statistiskais re\u0123ions",
+  LV005: "Latgales statistiskais re\u0123ions"
 };
 
 const LITHUANIA_REGION_CODES = [
@@ -62,11 +64,25 @@ const els = {
   ageMeta: document.querySelector("#ageMeta"),
   regionSection: document.querySelector("#regionSection"),
   regionTable: document.querySelector("#regionTable"),
+  nationalitySection: document.querySelector("#nationalitySection"),
+  nationalityTable: document.querySelector("#nationalityTable"),
+  nationalityMeta: document.querySelector("#nationalityMeta"),
   crossSection: document.querySelector("#crossSection"),
   crossTable: document.querySelector("#crossTable"),
   copy: document.querySelector("#copyButton"),
   download: document.querySelector("#downloadButton")
 };
+
+function ethnicityRows(nativeLabel, russianLabel, otherLabel, nativePopulation, russianPopulation, totalPopulation) {
+  const native = Number(nativePopulation) || 0;
+  const russian = Number(russianPopulation) || 0;
+  const total = Number(totalPopulation) || native + russian;
+  return [
+    { label: nativeLabel, population: native },
+    { label: russianLabel, population: russian },
+    { label: otherLabel, population: Math.max(0, total - native - russian) }
+  ];
+}
 
 async function pxWebPostSelection(baseUrl, tableId, query) {
   const response = await fetch(`${baseUrl}/${tableId}`, {
@@ -216,6 +232,29 @@ async function fetchEstoniaPopulation(year, minAge, maxAge) {
   };
 }
 
+async function fetchEstoniaNationality(year) {
+  const ageGroupCode = "Vanuser\u00fchm";
+  const data = await pxWebPostSelection(ESTONIA_API_BASE, ESTONIA_NATIONALITY_TABLE_ID, [
+    { code: "Aasta", selection: { filter: "item", values: [year] } },
+    { code: ageGroupCode, selection: { filter: "item", values: ["1"] } },
+    { code: "Maakond", selection: { filter: "item", values: ["1"] } },
+    { code: "Sugu", selection: { filter: "item", values: ["1"] } },
+    { code: "Rahvus", selection: { filter: "item", values: ["1", "2", "3"] } }
+  ]);
+  const parsed = parseJsonStat(data);
+  const valueFor = code => lookupValue(parsed, {
+    Aasta: year,
+    [ageGroupCode]: "1",
+    Maakond: "1",
+    Sugu: "1",
+    Rahvus: code
+  });
+  return {
+    rows: ethnicityRows("Estonian", "Russian", "Other", valueFor("2"), valueFor("3"), valueFor("1")),
+    sourceNote: "Statistics Estonia table RV022U. Whole-country nationality distribution."
+  };
+}
+
 async function fetchLatviaPopulation(year, minAge, maxAge) {
   const ageCodes = [];
   for (let age = minAge; age <= maxAge; age++) ageCodes.push(exactAgeCode(age));
@@ -260,6 +299,24 @@ async function fetchLatviaPopulation(year, minAge, maxAge) {
   };
 }
 
+async function fetchLatviaNationality(year) {
+  const data = await latviaPostSelection(LATVIA_NATIONALITY_TABLE_ID, [
+    { variableCode: "ETHNICITY", valueCodes: ["TOTAL", "E_LAT", "E_RUS"] },
+    { variableCode: "ContentsCode", valueCodes: [LATVIA_NATIONALITY_TABLE_ID] },
+    { variableCode: "TIME", valueCodes: [year] }
+  ]);
+  const parsed = parseJsonStat(data);
+  const valueFor = code => lookupValue(parsed, {
+    ETHNICITY: code,
+    ContentsCode: LATVIA_NATIONALITY_TABLE_ID,
+    TIME: year
+  });
+  return {
+    rows: ethnicityRows("Latvie\u0161u", "Krievu", "Cita", valueFor("E_LAT"), valueFor("E_RUS"), valueFor("TOTAL")),
+    sourceNote: "Central Statistics Bureau of Latvia table IRE010. Whole-country ethnicity distribution."
+  };
+}
+
 async function fetchLithuaniaPopulation(year) {
   const response = await fetch(`${LITHUANIA_PROXY_URL}?year=${encodeURIComponent(year)}`);
   if (!response.ok) {
@@ -293,10 +350,30 @@ async function fetchLithuaniaPopulation(year) {
   };
 }
 
+async function fetchLithuaniaNationality(year) {
+  const response = await fetch(`${LITHUANIA_PROXY_URL}?year=${encodeURIComponent(year)}`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || `Lithuania proxy returned ${response.status}`);
+  }
+  const data = await response.json();
+  if (!data.nationalityRows?.length) throw new Error("No Lithuania nationality rows found for this year.");
+  return {
+    rows: data.nationalityRows,
+    sourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R167_M3010215_1. Whole-country ethnicity distribution."
+  };
+}
+
 async function fetchPopulation(country, year, minAge, maxAge) {
   if (country === "EE") return fetchEstoniaPopulation(year, minAge, maxAge);
   if (country === "LV") return fetchLatviaPopulation(year, minAge, maxAge);
   return fetchLithuaniaPopulation(year);
+}
+
+async function fetchNationality(country, year) {
+  if (country === "EE") return fetchEstoniaNationality(year);
+  if (country === "LV") return fetchLatviaNationality(year);
+  return fetchLithuaniaNationality(year);
 }
 
 function aggregateNational(map, sexes, bands) {
@@ -389,7 +466,10 @@ async function buildQuotas() {
 
   try {
     const ageBands = getAgeBands(minAge, maxAge, grouping);
-    const population = await fetchPopulation(country, year, minAge, maxAge);
+    const [population, nationality] = await Promise.all([
+      fetchPopulation(country, year, minAge, maxAge),
+      fetchNationality(country, year)
+    ]);
     const national = population.national;
     state.latestPopulationData = national;
     state.latestRegionalData = population.regional;
@@ -437,6 +517,21 @@ async function buildQuotas() {
       }
     } else {
       els.regionSection.hidden = true;
+    }
+
+    if (nationality.rows?.length) {
+      const nationalityRows = buildQuotaRows(
+        nationality.rows.map(row => row.label),
+        nationality.rows.map(row => row.population),
+        sampleSize
+      );
+      const nationalityTotal = nationality.rows.reduce((sum, row) => sum + row.population, 0);
+      renderTable(els.nationalityTable, ["Nationality", "Population", "%", "Quota"], nationalityRows, ["Total", fmt(nationalityTotal), "100.0%", sampleSize]);
+      els.nationalityMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${nationality.sourceNote}`;
+      addExportRows("Nationality Distribution", ["Nationality", "Population", "%", "Quota"], nationalityRows, ["Total", fmt(nationalityTotal), "100.0%", sampleSize]);
+      els.nationalitySection.hidden = false;
+    } else {
+      els.nationalitySection.hidden = true;
     }
 
     if (sexes.length === 2) {

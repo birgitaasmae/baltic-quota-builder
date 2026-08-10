@@ -17,7 +17,7 @@ Open `index.html` in a browser. No build step is required.
 ## What It Does
 
 - Fetches Estonia, Latvia, and Lithuania population data from local official statistics bureau APIs.
-- Calculates sex, age, regional, and sex-by-age interlocked quotas.
+- Calculates sex, age, regional, nationality, and sex-by-age interlocked quotas.
 - Uses the largest-remainder method so quota totals match the requested sample size.
 - Exports tables as copied TSV or downloaded CSV.
 
@@ -38,8 +38,11 @@ The app will then be available from:
 - `app.js` - UI controller
 - `api/lithuania-population.js` - serverless proxy for Lithuania OSP SDMX data
 - Estonia: Statistics Estonia table `RV0240`
+- Estonia nationality: Statistics Estonia table `RV022U`
 - Latvia: Central Statistics Bureau API v2 table `IRD041`
+- Latvia nationality: Central Statistics Bureau table `IRE010`
 - Lithuania: State Data Agency / Official Statistics Portal SDMX flow `S3R167_M3010202`
+- Lithuania nationality: State Data Agency / Official Statistics Portal SDMX flow `S3R167_M3010215_1`
 
 ## Backend Proxy
 
