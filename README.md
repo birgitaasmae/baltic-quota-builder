@@ -37,8 +37,17 @@ The app will then be available from:
 - `index.html` - app shell
 - `styles.css` - page styling
 - `app.js` - UI controller
+- `api/lithuania-population.js` - serverless proxy for Lithuania OSP SDMX data
 - Latvia: Central Statistics Bureau API v2 table `IRD041`
 - Lithuania: State Data Agency / Official Statistics Portal SDMX flow `S3R167_M3010222`
+
+## Backend Proxy
+
+GitHub Pages cannot reliably call Lithuania's SDMX XML endpoint directly from the browser. The Lithuania calculator uses a small serverless proxy:
+
+`/api/lithuania-population?year=2024`
+
+Deploy this same repository to Vercel to make the proxy available.
 
 ## Next Implementation Steps
 

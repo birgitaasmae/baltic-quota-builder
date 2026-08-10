@@ -1,5 +1,7 @@
 const LATVIA_API_BASE = "https://api.stat.gov.lv/api/v2";
-const LITHUANIA_SDMX_BASE = "https://osp-rs.stat.gov.lt/rest_xml/data/LSD";
+const LITHUANIA_PROXY_URL = location.hostname.endsWith("github.io")
+  ? "https://baltic-quota-builder.vercel.app/api/lithuania-population"
+  : "/api/lithuania-population";
 
 const COUNTRY_NAMES = {
   LV: "Latvia",
@@ -11,15 +13,6 @@ const LITHUANIA_FLOW_ID = "S3R167_M3010222";
 
 const LATVIA_REGION_CODES = [
   "LV00A", "LV00C", "LV00B", "LV009", "LV005"
-];
-
-const LITHUANIA_AGE_BANDS = [
-  ["g000g004", 0, 4], ["g005g009", 5, 9], ["g010g014", 10, 14],
-  ["g015g019", 15, 19], ["g020g024", 20, 24], ["g025g029", 25, 29],
-  ["g030g034", 30, 34], ["g035g039", 35, 39], ["g040g044", 40, 44],
-  ["g045g049", 45, 49], ["g050g054", 50, 54], ["g055g059", 55, 59],
-  ["g060g064", 60, 64], ["g065g069", 65, 69], ["g070g074", 70, 74],
-  ["g075g079", 75, 79], ["g080g084", 80, 84], ["g085", 85, 99]
 ];
 
 const state = {
@@ -199,37 +192,19 @@ async function fetchLatviaPopulation(year, minAge, maxAge) {
 }
 
 async function fetchLithuaniaPopulation(year) {
-  const url = `${LITHUANIA_SDMX_BASE},${LITHUANIA_FLOW_ID}/.?startPeriod=${year}&endPeriod=${year}`;
-  const response = await fetch(url, { credentials: "include" });
-  if (!response.ok) throw new Error(`Lithuania OSP returned ${response.status}`);
-  const xml = new DOMParser().parseFromString(await response.text(), "application/xml");
+  const response = await fetch(`${LITHUANIA_PROXY_URL}?year=${encodeURIComponent(year)}`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || `Lithuania proxy returned ${response.status}`);
+  }
+  const data = await response.json();
   const national = new Map();
 
-  for (const obs of Array.from(xml.getElementsByTagNameNS("*", "Obs"))) {
-    const key = {};
-    for (const value of Array.from(obs.getElementsByTagNameNS("*", "Value"))) {
-      const id = value.getAttribute("id");
-      if (id) key[id] = value.getAttribute("value");
+  for (const row of data.rows) {
+    const perAge = row.population / (row.ageTo - row.ageFrom + 1);
+    for (let age = row.ageFrom; age <= row.ageTo; age++) {
+      national.set(`${row.sex}|${age}`, (national.get(`${row.sex}|${age}`) || 0) + perAge);
     }
-    if (key.salisM301022 !== "TOT_gimimo") continue;
-    if (key.indeksas_M3010216 !== "0") continue;
-    if (key.MATVNT !== "asmenys") continue;
-    if (key.LAIKOTARPIS !== year) continue;
-    if (!["1", "2"].includes(key.Lytis)) continue;
-
-    const ageBand = LITHUANIA_AGE_BANDS.find(([code]) => code === key.Demogr_amziaus_grM1412);
-    if (!ageBand) continue;
-
-    const rawValue = obs.getElementsByTagNameNS("*", "ObsValue")[0]?.getAttribute("value");
-    const total = Number(rawValue);
-    if (!Number.isFinite(total) || total <= 0) continue;
-
-    const sex = key.Lytis === "1" ? "M" : "F";
-    const [, from, to] = ageBand;
-    const perAge = total / (to - from + 1);
-    for (let age = from; age <= to; age++) {
-      national.set(`${sex}|${age}`, (national.get(`${sex}|${age}`) || 0) + perAge);
-      }
   }
 
   return {
@@ -416,8 +391,8 @@ async function buildQuotas() {
     els.download.disabled = false;
     els.status.textContent = `Built quotas for ${COUNTRY_NAMES[country]} from local statistics bureau data.`;
   } catch (error) {
-    if (country === "LT" && /fetch/i.test(error.message)) {
-      els.status.textContent = "Lithuania uses the local Official Statistics Portal SDMX source, but GitHub Pages cannot fetch that endpoint directly in the browser. This needs a small backend proxy, like the Estonian quota builder.";
+    if (country === "LT" && /fetch|proxy/i.test(error.message)) {
+      els.status.textContent = "Lithuania uses the local Official Statistics Portal SDMX source through the Baltic proxy. The proxy is not reachable yet or returned an error.";
     } else {
       els.status.textContent = error.message;
     }
