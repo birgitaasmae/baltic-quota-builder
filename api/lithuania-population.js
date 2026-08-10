@@ -2,6 +2,8 @@ const FLOW_ID = "S3R167_M3010202";
 const SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${FLOW_ID}/.`;
 const NATIONALITY_FLOW_ID = "S3R167_M3010215_1";
 const NATIONALITY_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${NATIONALITY_FLOW_ID}/.`;
+const EDUCATION_FLOW_ID = "S3R143_M3110116";
+const EDUCATION_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${EDUCATION_FLOW_ID}/.`;
 
 const NATIONAL_REGION_CODE = "00";
 const COUNTY_LABELS = new Map([
@@ -85,6 +87,40 @@ function parseLithuaniaNationalityXml(xml, year) {
   ];
 }
 
+function parseLithuaniaEducationXml(xml, year) {
+  let total = 0;
+  const values = new Map();
+  const obsPattern = /<g:Obs><g:ObsKey>([\s\S]*?)<\/g:ObsKey><g:ObsValue value="([^"]*)"/g;
+  let match;
+
+  while ((match = obsPattern.exec(xml)) !== null) {
+    const keyBlock = match[1];
+    if (readKeyValue(keyBlock, "Lytis") !== "0") continue;
+    if (readKeyValue(keyBlock, "Vietove") !== "0") continue;
+    if (readKeyValue(keyBlock, "amziusM3030902") !== "15_ir_daugiau") continue;
+    if (readKeyValue(keyBlock, "MATVNT") !== "tukst") continue;
+    if (readKeyValue(keyBlock, "LAIKOTARPIS") !== year) continue;
+
+    const code = readKeyValue(keyBlock, "issilavinimasM3031301");
+    const population = Number(match[2]) * 1000;
+    if (!code || !Number.isFinite(population) || population <= 0) continue;
+
+    if (code === "0") total = population;
+    else values.set(code, population);
+  }
+
+  const basic = (values.get("5") || 0) + (values.get("4") || 0);
+  const secondary = (values.get("3") || 0) + (values.get("2s") || 0);
+  const higher = values.get("1") || 0;
+
+  return [
+    { label: "Basic or lower", population: basic },
+    { label: "Secondary", population: secondary },
+    { label: "Higher", population: higher },
+    { label: "Other or unknown", population: Math.max(0, total - basic - secondary - higher) }
+  ].filter(row => row.population > 0);
+}
+
 export default async function handler(request, response) {
   const year = String(request.query.year || "2024");
 
@@ -104,9 +140,10 @@ export default async function handler(request, response) {
   }
 
   try {
-    const [sourceResponse, nationalityResponse] = await Promise.all([
+    const [sourceResponse, nationalityResponse, educationResponse] = await Promise.all([
       fetch(`${SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`),
-      fetch(`${NATIONALITY_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`)
+      fetch(`${NATIONALITY_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`),
+      fetch(`${EDUCATION_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`)
     ]);
     if (!sourceResponse.ok) {
       response.status(sourceResponse.status).json({ error: `Lithuania OSP returned ${sourceResponse.status}` });
@@ -116,11 +153,17 @@ export default async function handler(request, response) {
       response.status(nationalityResponse.status).json({ error: `Lithuania OSP nationality flow returned ${nationalityResponse.status}` });
       return;
     }
+    if (!educationResponse.ok) {
+      response.status(educationResponse.status).json({ error: `Lithuania OSP education flow returned ${educationResponse.status}` });
+      return;
+    }
 
     const xml = await sourceResponse.text();
     const nationalityXml = await nationalityResponse.text();
+    const educationXml = await educationResponse.text();
     const rows = parseLithuaniaXml(xml, year);
     const nationalityRows = parseLithuaniaNationalityXml(nationalityXml, year);
+    const educationRows = parseLithuaniaEducationXml(educationXml, year);
     if (!rows.length) {
       response.status(404).json({ error: "No Lithuania population rows found for this year" });
       return;
@@ -130,10 +173,13 @@ export default async function handler(request, response) {
       source: "State Data Agency of Lithuania / Official Statistics Portal",
       flow: FLOW_ID,
       nationalityFlow: NATIONALITY_FLOW_ID,
+      educationFlow: EDUCATION_FLOW_ID,
       regionalLevel: "counties",
       year,
       rows,
-      nationalityRows
+      nationalityRows,
+      educationRows,
+      educationSourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R143_M3110116. Whole-country population aged 15+ by educational attainment."
     });
   } catch (error) {
     response.status(502).json({ error: error.message });

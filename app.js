@@ -12,13 +12,24 @@ const COUNTRY_NAMES = {
 
 const ESTONIA_TABLE_ID = "RV0240";
 const ESTONIA_NATIONALITY_TABLE_ID = "RV022U";
+const ESTONIA_EDUCATION_TABLE_ID = "RV0231U";
 const LATVIA_TABLE_ID = "IRD041";
 const LATVIA_NATIONALITY_TABLE_ID = "IRE010";
+const LATVIA_EDUCATION_TABLE_ID = "IZT010";
 const LITHUANIA_FLOW_ID = "S3R167_M3010202";
 
 const ESTONIA_REGION_CODES = [
-  "H6", "H10", "H14", "H18", "H22"
+  "784", "37_NO_TALLINN", "39", "44", "49", "51", "57", "59", "65", "67", "70", "74", "78", "82", "84", "86"
 ];
+
+const ESTONIA_REGION_QUERY_CODES = [
+  "37", "784", "39", "44", "49", "51", "57", "59", "65", "67", "70", "74", "78", "82", "84", "86"
+];
+
+const ESTONIA_REGION_LABELS = {
+  784: "Tallinn",
+  "37_NO_TALLINN": "Harju maakond (without Tallinn)"
+};
 
 const LATVIA_REGION_CODES = [
   "LV00A", "LV00C", "LV00B", "LV009", "LV005"
@@ -67,6 +78,9 @@ const els = {
   nationalitySection: document.querySelector("#nationalitySection"),
   nationalityTable: document.querySelector("#nationalityTable"),
   nationalityMeta: document.querySelector("#nationalityMeta"),
+  educationSection: document.querySelector("#educationSection"),
+  educationTable: document.querySelector("#educationTable"),
+  educationMeta: document.querySelector("#educationMeta"),
   crossSection: document.querySelector("#crossSection"),
   crossTable: document.querySelector("#crossTable"),
   copy: document.querySelector("#copyButton"),
@@ -82,6 +96,17 @@ function ethnicityRows(nativeLabel, russianLabel, otherLabel, nativePopulation, 
     { label: russianLabel, population: russian },
     { label: otherLabel, population: Math.max(0, total - native - russian) }
   ];
+}
+
+function educationRows(basicPopulation, secondaryPopulation, higherPopulation, otherPopulation = 0) {
+  const rows = [
+    { label: "Basic or lower", population: Number(basicPopulation) || 0 },
+    { label: "Secondary", population: Number(secondaryPopulation) || 0 },
+    { label: "Higher", population: Number(higherPopulation) || 0 }
+  ];
+  const other = Number(otherPopulation) || 0;
+  if (other > 0) rows.push({ label: "Other or unknown", population: other });
+  return rows;
 }
 
 async function pxWebPostSelection(baseUrl, tableId, query) {
@@ -192,7 +217,7 @@ function largestRemainder(proportions, total) {
 async function fetchEstoniaPopulation(year, minAge, maxAge) {
   const ageCodes = [];
   for (let age = minAge; age <= maxAge; age++) ageCodes.push(String(age));
-  const areaCodes = ["00", ...ESTONIA_REGION_CODES];
+  const areaCodes = ["00", ...ESTONIA_REGION_QUERY_CODES];
 
   const data = await pxWebPostSelection(ESTONIA_API_BASE, ESTONIA_TABLE_ID, [
     { code: "Sugu", selection: { filter: "item", values: ["2", "3"] } },
@@ -202,8 +227,9 @@ async function fetchEstoniaPopulation(year, minAge, maxAge) {
   ]);
   const parsed = parseJsonStat(data);
   const national = new Map();
+  const rawRegional = new Map();
   const regional = new Map();
-  const labels = parsed.dimLabels.Elukoht || {};
+  const labels = { ...(parsed.dimLabels.Elukoht || {}), ...ESTONIA_REGION_LABELS };
   const sexCodeByKey = { M: "2", F: "3" };
 
   for (const area of areaCodes) {
@@ -217,8 +243,19 @@ async function fetchEstoniaPopulation(year, minAge, maxAge) {
         });
         if (value > 0) {
           if (area === "00") national.set(`${sex}|${age}`, value);
-          else regional.set(`${sex}|${age}|${area}`, value);
+          else rawRegional.set(`${sex}|${age}|${area}`, value);
         }
+      }
+    }
+  }
+  for (const area of ESTONIA_REGION_CODES) {
+    for (const sex of ["M", "F"]) {
+      for (let age = minAge; age <= maxAge; age++) {
+        const key = `${sex}|${age}`;
+        const value = area === "37_NO_TALLINN"
+          ? Math.max(0, (rawRegional.get(`${key}|37`) || 0) - (rawRegional.get(`${key}|784`) || 0))
+          : rawRegional.get(`${key}|${area}`) || 0;
+        if (value > 0) regional.set(`${key}|${area}`, value);
       }
     }
   }
@@ -252,6 +289,29 @@ async function fetchEstoniaNationality(year) {
   return {
     rows: ethnicityRows("Estonian", "Russian", "Other", valueFor("2"), valueFor("3"), valueFor("1")),
     sourceNote: "Statistics Estonia table RV022U. Whole-country nationality distribution."
+  };
+}
+
+async function fetchEstoniaEducation(year) {
+  const ageGroupCode = "Vanuser\u00fchm";
+  const data = await pxWebPostSelection(ESTONIA_API_BASE, ESTONIA_EDUCATION_TABLE_ID, [
+    { code: "Maakond", selection: { filter: "item", values: ["1"] } },
+    { code: "Haridustase", selection: { filter: "item", values: ["2", "7", "11", "16"] } },
+    { code: "Aasta", selection: { filter: "item", values: [year] } },
+    { code: "Sugu", selection: { filter: "item", values: ["1"] } },
+    { code: ageGroupCode, selection: { filter: "item", values: ["1"] } }
+  ]);
+  const parsed = parseJsonStat(data);
+  const valueFor = code => lookupValue(parsed, {
+    Maakond: "1",
+    Haridustase: code,
+    Aasta: year,
+    Sugu: "1",
+    [ageGroupCode]: "1"
+  });
+  return {
+    rows: educationRows(valueFor("2"), valueFor("7"), valueFor("11"), valueFor("16")),
+    sourceNote: "Statistics Estonia table RV0231U. Whole-country population aged 15+ by education."
   };
 }
 
@@ -317,6 +377,31 @@ async function fetchLatviaNationality(year) {
   };
 }
 
+async function fetchLatviaEducation(year) {
+  const data = await latviaPostSelection(LATVIA_EDUCATION_TABLE_ID, [
+    { variableCode: "EDUCATION_LEVEL", valueCodes: ["TOTAL", "ED0", "ED1", "ED2", "ED3", "ED4", "ED5", "ED6", "ED7", "ED8"] },
+    { variableCode: "AgeGroup", valueCodes: ["TOTAL"] },
+    { variableCode: "SEX", valueCodes: ["T"] },
+    { variableCode: "ContentsCode", valueCodes: [LATVIA_EDUCATION_TABLE_ID] },
+    { variableCode: "TIME", valueCodes: [year] }
+  ]);
+  const parsed = parseJsonStat(data);
+  const valueFor = code => lookupValue(parsed, {
+    EDUCATION_LEVEL: code,
+    AgeGroup: "TOTAL",
+    SEX: "T",
+    ContentsCode: LATVIA_EDUCATION_TABLE_ID,
+    TIME: year
+  });
+  const basic = ["ED0", "ED1", "ED2"].reduce((sum, code) => sum + (valueFor(code) || 0), 0);
+  const secondary = ["ED3", "ED4"].reduce((sum, code) => sum + (valueFor(code) || 0), 0);
+  const higher = ["ED5", "ED6", "ED7", "ED8"].reduce((sum, code) => sum + (valueFor(code) || 0), 0);
+  return {
+    rows: educationRows(basic, secondary, higher),
+    sourceNote: "Central Statistics Bureau of Latvia table IZT010. Whole-country population aged 15+ by educational attainment."
+  };
+}
+
 async function fetchLithuaniaPopulation(year) {
   const response = await fetch(`${LITHUANIA_PROXY_URL}?year=${encodeURIComponent(year)}`);
   if (!response.ok) {
@@ -364,6 +449,20 @@ async function fetchLithuaniaNationality(year) {
   };
 }
 
+async function fetchLithuaniaEducation(year) {
+  const response = await fetch(`${LITHUANIA_PROXY_URL}?year=${encodeURIComponent(year)}`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || `Lithuania proxy returned ${response.status}`);
+  }
+  const data = await response.json();
+  if (!data.educationRows?.length) throw new Error("No Lithuania education rows found for this year.");
+  return {
+    rows: data.educationRows,
+    sourceNote: data.educationSourceNote || "State Data Agency of Lithuania / Official Statistics Portal education data. Whole-country education distribution."
+  };
+}
+
 async function fetchPopulation(country, year, minAge, maxAge) {
   if (country === "EE") return fetchEstoniaPopulation(year, minAge, maxAge);
   if (country === "LV") return fetchLatviaPopulation(year, minAge, maxAge);
@@ -374,6 +473,12 @@ async function fetchNationality(country, year) {
   if (country === "EE") return fetchEstoniaNationality(year);
   if (country === "LV") return fetchLatviaNationality(year);
   return fetchLithuaniaNationality(year);
+}
+
+async function fetchEducation(country, year) {
+  if (country === "EE") return fetchEstoniaEducation(year);
+  if (country === "LV") return fetchLatviaEducation(year);
+  return fetchLithuaniaEducation(year);
 }
 
 function aggregateNational(map, sexes, bands) {
@@ -466,10 +571,13 @@ async function buildQuotas() {
 
   try {
     const ageBands = getAgeBands(minAge, maxAge, grouping);
-    const [population, nationality] = await Promise.all([
-      fetchPopulation(country, year, minAge, maxAge),
-      fetchNationality(country, year)
+    const population = await fetchPopulation(country, year, minAge, maxAge);
+    const [nationalityResult, educationResult] = await Promise.allSettled([
+      fetchNationality(country, year),
+      fetchEducation(country, year)
     ]);
+    const nationality = nationalityResult.status === "fulfilled" ? nationalityResult.value : null;
+    const education = educationResult.status === "fulfilled" ? educationResult.value : null;
     const national = population.national;
     state.latestPopulationData = national;
     state.latestRegionalData = population.regional;
@@ -519,7 +627,7 @@ async function buildQuotas() {
       els.regionSection.hidden = true;
     }
 
-    if (nationality.rows?.length) {
+    if (nationality?.rows?.length) {
       const nationalityRows = buildQuotaRows(
         nationality.rows.map(row => row.label),
         nationality.rows.map(row => row.population),
@@ -532,6 +640,21 @@ async function buildQuotas() {
       els.nationalitySection.hidden = false;
     } else {
       els.nationalitySection.hidden = true;
+    }
+
+    if (education?.rows?.length) {
+      const educationRowsForTable = buildQuotaRows(
+        education.rows.map(row => row.label),
+        education.rows.map(row => row.population),
+        sampleSize
+      );
+      const educationTotal = education.rows.reduce((sum, row) => sum + row.population, 0);
+      renderTable(els.educationTable, ["Education", "Population", "%", "Quota"], educationRowsForTable, ["Total", fmt(educationTotal), "100.0%", sampleSize]);
+      els.educationMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${education.sourceNote}`;
+      addExportRows("Education Distribution", ["Education", "Population", "%", "Quota"], educationRowsForTable, ["Total", fmt(educationTotal), "100.0%", sampleSize]);
+      els.educationSection.hidden = false;
+    } else {
+      els.educationSection.hidden = true;
     }
 
     if (sexes.length === 2) {
