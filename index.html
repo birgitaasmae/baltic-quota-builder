@@ -10,7 +10,7 @@
     <main class="app-shell">
       <section class="toolbar" aria-label="Quota builder controls">
         <div>
-          <p class="eyebrow">Latvia and Lithuania only</p>
+          <p class="eyebrow">Estonia, Latvia, and Lithuania</p>
           <h1>Baltic Quota Builder</h1>
         </div>
 
@@ -25,6 +25,7 @@
           <label class="field">
             <span>Country</span>
             <select id="countrySelect">
+              <option value="EE">Estonia</option>
               <option value="LV">Latvia</option>
               <option value="LT">Lithuania</option>
             </select>
@@ -90,24 +91,6 @@
         </div>
       </section>
 
-      <section class="sample-panel">
-        <article>
-          <span class="sample-label">Quick read</span>
-          <strong id="quickSample">385</strong>
-          <p>Approx. 95% confidence, 5% margin of error.</p>
-        </article>
-        <article>
-          <span class="sample-label">Standard study</span>
-          <strong id="standardSample">600</strong>
-          <p>More stable quotas for multiple demographic groups.</p>
-        </article>
-        <article>
-          <span class="sample-label">Robust quotas</span>
-          <strong id="robustSample">1000</strong>
-          <p>Better for age, sex, and regional quota cells.</p>
-        </article>
-      </section>
-
       <section id="summaryPanel" class="panel summary-panel" hidden>
         <div>
           <span class="sample-label">Population Base</span>
@@ -158,6 +141,6 @@
       </section>
     </main>
 
-    <script type="module" src="app.js?v=lt-proxy-1"></script>
+    <script type="module" src="app.js?v=ee-1"></script>
   </body>
 </html>

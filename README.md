@@ -1,14 +1,14 @@
 # Baltic Quota Builder
 
-Separate Latvia and Lithuania quota-builder project.
+Separate Baltic quota-builder project for Estonia, Latvia, and Lithuania.
 
-This repository is intentionally separate from the existing Estonia quota builder so changes here cannot affect the Estonian app, API, or deployment.
+This repository is intentionally separate from the existing Estonia quota builder so changes here cannot affect the older Estonian app, API, or deployment.
 
 ## Scope
 
+- Estonia data source: Statistics Estonia API / PxWeb API.
 - Latvia data source: Official Statistics Portal of Latvia API / PxWeb API.
 - Lithuania data source: Official Statistics Portal SDMX 2.1 REST API.
-- Estonia is not included in this app.
 
 ## Local Use
 
@@ -16,10 +16,9 @@ Open `index.html` in a browser. No build step is required.
 
 ## What It Does
 
-- Fetches Latvia and Lithuania population data from local official statistics bureau APIs.
+- Fetches Estonia, Latvia, and Lithuania population data from local official statistics bureau APIs.
 - Calculates sex, age, regional, and sex-by-age interlocked quotas.
 - Uses the largest-remainder method so quota totals match the requested sample size.
-- Suggests quick, standard, and robust sample sizes from the selected population base.
 - Exports tables as copied TSV or downloaded CSV.
 
 ## GitHub Pages
@@ -38,6 +37,7 @@ The app will then be available from:
 - `styles.css` - page styling
 - `app.js` - UI controller
 - `api/lithuania-population.js` - serverless proxy for Lithuania OSP SDMX data
+- Estonia: Statistics Estonia table `RV0240`
 - Latvia: Central Statistics Bureau API v2 table `IRD041`
 - Lithuania: State Data Agency / Official Statistics Portal SDMX flow `S3R167_M3010222`
 
@@ -54,4 +54,4 @@ Deploy this same repository to Vercel to make the proxy available.
 1. Add education, citizenship, and country-of-birth tables after mapping source category codes.
 2. Map the Lithuanian territorial matrix for regional quotas.
 3. Add automated consistency tests for totals and regional splits.
-4. Keep deployments separate from the Estonian quota builder until Latvia/Lithuania are fully verified.
+4. Keep deployments separate from the older Estonian quota builder.

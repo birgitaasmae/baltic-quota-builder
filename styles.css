@@ -69,8 +69,7 @@ h2 {
 }
 
 .panel,
-.table-section,
-.sample-panel article {
+.table-section {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -138,29 +137,14 @@ button.secondary {
   font-size: 14px;
 }
 
-.sample-panel {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin: 20px 0;
-}
-
-.sample-panel article,
 .summary-panel {
   padding: 18px;
 }
 
-.sample-panel strong,
 .summary-panel strong {
   display: block;
   font-size: 26px;
   margin-bottom: 8px;
-}
-
-.sample-panel p {
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.4;
 }
 
 .summary-panel {
@@ -236,7 +220,6 @@ tfoot td {
   }
 
   .grid,
-  .sample-panel,
   .summary-panel {
     grid-template-columns: 1fr;
   }
