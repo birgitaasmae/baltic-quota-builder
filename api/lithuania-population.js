@@ -184,12 +184,10 @@ export default async function handler(request, response) {
   }
 
   try {
-    const [sourceResponse, nationalityResponse, educationResponse, urbanRuralResponse, cityTownResponse] = await Promise.all([
+    const [sourceResponse, nationalityResponse, educationResponse] = await Promise.all([
       fetch(`${SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`),
       fetch(`${NATIONALITY_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`),
-      fetch(`${EDUCATION_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`),
-      fetch(`${URBAN_RURAL_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`),
-      fetch(`${CITY_TOWN_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`)
+      fetch(`${EDUCATION_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`)
     ]);
     if (!sourceResponse.ok) {
       response.status(sourceResponse.status).json({ error: `Lithuania OSP returned ${sourceResponse.status}` });
@@ -203,24 +201,23 @@ export default async function handler(request, response) {
       response.status(educationResponse.status).json({ error: `Lithuania OSP education flow returned ${educationResponse.status}` });
       return;
     }
-    if (!urbanRuralResponse.ok) {
-      response.status(urbanRuralResponse.status).json({ error: `Lithuania OSP urban/rural flow returned ${urbanRuralResponse.status}` });
-      return;
-    }
-    if (!cityTownResponse.ok) {
-      response.status(cityTownResponse.status).json({ error: `Lithuania OSP city/town flow returned ${cityTownResponse.status}` });
-      return;
-    }
 
     const xml = await sourceResponse.text();
     const nationalityXml = await nationalityResponse.text();
     const educationXml = await educationResponse.text();
-    const urbanRuralXml = await urbanRuralResponse.text();
-    const cityTownXml = await cityTownResponse.text();
     const rows = parseLithuaniaXml(xml, year);
     const nationalityRows = parseLithuaniaNationalityXml(nationalityXml, year);
     const educationRows = parseLithuaniaEducationXml(educationXml, year);
-    const settlementRows = parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year);
+    let settlementRows = [];
+    const [urbanRuralResult, cityTownResult] = await Promise.allSettled([
+      fetch(`${URBAN_RURAL_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`),
+      fetch(`${CITY_TOWN_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`)
+    ]);
+    if (urbanRuralResult.status === "fulfilled" && cityTownResult.status === "fulfilled" && urbanRuralResult.value.ok && cityTownResult.value.ok) {
+      const urbanRuralXml = await urbanRuralResult.value.text();
+      const cityTownXml = await cityTownResult.value.text();
+      settlementRows = parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year);
+    }
     if (!rows.length) {
       response.status(404).json({ error: "No Lithuania population rows found for this year" });
       return;
