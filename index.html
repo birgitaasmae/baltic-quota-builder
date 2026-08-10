@@ -10,60 +10,151 @@
     <main class="app-shell">
       <section class="toolbar" aria-label="Quota builder controls">
         <div>
-          <p class="eyebrow">Separate Latvia and Lithuania workspace</p>
+          <p class="eyebrow">Latvia and Lithuania only</p>
           <h1>Baltic Quota Builder</h1>
         </div>
 
-        <label class="field">
-          <span>Country</span>
-          <select id="countrySelect">
-            <option value="latvia">Latvia</option>
-            <option value="lithuania">Lithuania</option>
-          </select>
-        </label>
+        <div class="toolbar-actions">
+          <button id="copyButton" class="secondary" type="button" disabled>Copy TSV</button>
+          <button id="downloadButton" class="secondary" type="button" disabled>Download CSV</button>
+        </div>
       </section>
 
-      <section class="panel">
-        <div class="panel-header">
-          <div>
-            <h2 id="countryName">Latvia</h2>
-            <p id="sourceDescription">Official Statistics Portal API / PxWeb API.</p>
-          </div>
-          <a id="sourceLink" href="https://stat.gov.lv/en/api-un-kodu-vardnicas/api-v2" target="_blank" rel="noreferrer">Source API</a>
-        </div>
-
+      <section class="panel controls">
         <div class="grid">
           <label class="field">
+            <span>Country</span>
+            <select id="countrySelect">
+              <option value="LV">Latvia</option>
+              <option value="LT">Lithuania</option>
+            </select>
+          </label>
+
+          <label class="field">
             <span>Year</span>
-            <input id="yearInput" type="number" min="2000" max="2100" value="2025">
+            <select id="yearSelect">
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+              <option value="2023">2023</option>
+              <option value="2022">2022</option>
+              <option value="2021">2021</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Sample Size</span>
+            <input id="sampleSizeInput" type="number" min="10" max="100000" value="1000">
           </label>
 
           <label class="field">
             <span>Minimum Age</span>
-            <input id="minAgeInput" type="number" min="0" max="120" value="18">
+            <input id="minAgeInput" type="number" min="0" max="99" value="18">
           </label>
 
           <label class="field">
             <span>Maximum Age</span>
-            <input id="maxAgeInput" type="number" min="0" max="120" value="74">
+            <input id="maxAgeInput" type="number" min="0" max="99" value="74">
+          </label>
+
+          <label class="field">
+            <span>Age Grouping</span>
+            <select id="ageGroupingSelect">
+              <option value="1">1-year</option>
+              <option value="5" selected>5-year</option>
+              <option value="10">10-year</option>
+              <option value="15">15-year</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Sex Filter</span>
+            <select id="sexFilterSelect">
+              <option value="MF">Both</option>
+              <option value="M">Male only</option>
+              <option value="F">Female only</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Regional Level</span>
+            <select id="regionLevelSelect">
+              <option value="0">Country only</option>
+              <option value="3" selected>NUTS3 regions</option>
+            </select>
           </label>
         </div>
 
-        <fieldset class="dimensions">
-          <legend>Quota Dimensions</legend>
-          <label><input type="checkbox" checked> Age</label>
-          <label><input type="checkbox" checked> Gender</label>
-          <label><input type="checkbox"> Region</label>
-          <label><input type="checkbox"> Education</label>
-          <label><input type="checkbox"> Citizenship</label>
-          <label><input type="checkbox"> Country of birth</label>
-        </fieldset>
-
         <div class="actions">
-          <button id="inspectButton" type="button">Inspect Data Source</button>
+          <button id="buildButton" type="button">Build Quotas</button>
+          <span id="statusText" class="status-text">Ready.</span>
         </div>
+      </section>
 
-        <pre id="output" class="output">Choose a country and inspect the data source.</pre>
+      <section class="sample-panel">
+        <article>
+          <span class="sample-label">Quick read</span>
+          <strong id="quickSample">385</strong>
+          <p>Approx. 95% confidence, 5% margin of error.</p>
+        </article>
+        <article>
+          <span class="sample-label">Standard study</span>
+          <strong id="standardSample">600</strong>
+          <p>More stable quotas for multiple demographic groups.</p>
+        </article>
+        <article>
+          <span class="sample-label">Robust quotas</span>
+          <strong id="robustSample">1000</strong>
+          <p>Better for age, sex, and regional quota cells.</p>
+        </article>
+      </section>
+
+      <section id="summaryPanel" class="panel summary-panel" hidden>
+        <div>
+          <span class="sample-label">Population Base</span>
+          <strong id="populationBase">0</strong>
+        </div>
+        <div>
+          <span class="sample-label">Selected Sample</span>
+          <strong id="selectedSample">0</strong>
+        </div>
+        <div>
+          <span class="sample-label">Estimated Margin</span>
+          <strong id="estimatedMargin">0%</strong>
+        </div>
+      </section>
+
+      <section id="results" class="results" hidden>
+        <article class="table-section">
+          <div class="table-heading">
+            <h2>Sex Distribution</h2>
+            <p>Largest-remainder quotas from the selected population base.</p>
+          </div>
+          <div id="sexTable"></div>
+        </article>
+
+        <article class="table-section">
+          <div class="table-heading">
+            <h2>Age Distribution</h2>
+            <p id="ageMeta">Age quotas use the selected grouping.</p>
+          </div>
+          <div id="ageTable"></div>
+        </article>
+
+        <article id="regionSection" class="table-section">
+          <div class="table-heading">
+            <h2>Regional Distribution</h2>
+            <p>Regional data uses Eurostat NUTS region population tables.</p>
+          </div>
+          <div id="regionTable"></div>
+        </article>
+
+        <article id="crossSection" class="table-section">
+          <div class="table-heading">
+            <h2>Sex x Age Interlocked Quotas</h2>
+            <p>Useful when your survey tool supports crossed quota cells.</p>
+          </div>
+          <div id="crossTable"></div>
+        </article>
       </section>
     </main>
 

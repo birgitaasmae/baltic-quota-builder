@@ -14,6 +14,14 @@ This repository is intentionally separate from the existing Estonia quota builde
 
 Open `index.html` in a browser. No build step is required.
 
+## What It Does
+
+- Fetches Latvia and Lithuania population data from Eurostat demographic tables.
+- Calculates sex, age, regional, and sex-by-age interlocked quotas.
+- Uses the largest-remainder method so quota totals match the requested sample size.
+- Suggests quick, standard, and robust sample sizes from the selected population base.
+- Exports tables as copied TSV or downloaded CSV.
+
 ## GitHub Pages
 
 After pushing this repo to GitHub, enable Pages from:
@@ -29,12 +37,12 @@ The app will then be available from:
 - `index.html` - app shell
 - `styles.css` - page styling
 - `app.js` - UI controller
-- `src/data-sources/latvia.js` - Latvia API adapter
-- `src/data-sources/lithuania.js` - Lithuania API adapter
+- `src/data-sources/latvia.js` - Latvia national API adapter scaffold
+- `src/data-sources/lithuania.js` - Lithuania national API adapter scaffold
 
 ## Next Implementation Steps
 
-1. Identify the exact Latvia and Lithuania source tables for age, gender, region, education, language, citizenship, and country of birth.
-2. Map each table's native codes to shared quota dimensions.
-3. Add consistency tests for totals and regional splits before publishing live calculations.
+1. Add education, citizenship, and country-of-birth tables after mapping source category codes.
+2. Replace or supplement Eurostat with national API adapters where national tables provide better detail.
+3. Add automated consistency tests for totals and regional splits.
 4. Keep deployments separate from the Estonian quota builder until Latvia/Lithuania are fully verified.
