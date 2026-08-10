@@ -380,7 +380,7 @@ async function buildQuotas() {
       if (nonZero.length) {
         const regionalTotal = nonZero.reduce((sum, row) => sum + row.population, 0);
         const regionRows = buildQuotaRows(
-          nonZero.map(row => `${regional.labels[row.code]} (${row.code})`),
+          nonZero.map(row => `${population.labels[row.code]} (${row.code})`),
           nonZero.map(row => row.population),
           sampleSize
         );
