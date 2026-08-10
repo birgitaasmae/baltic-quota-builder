@@ -4,6 +4,10 @@ const NATIONALITY_FLOW_ID = "S3R167_M3010215_1";
 const NATIONALITY_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${NATIONALITY_FLOW_ID}/.`;
 const EDUCATION_FLOW_ID = "S3R143_M3110116";
 const EDUCATION_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${EDUCATION_FLOW_ID}/.`;
+const URBAN_RURAL_FLOW_ID = "S3R167_M3010205";
+const URBAN_RURAL_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${URBAN_RURAL_FLOW_ID}/.`;
+const CITY_TOWN_FLOW_ID = "S3R167_M3010210_1";
+const CITY_TOWN_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${CITY_TOWN_FLOW_ID}/.`;
 
 const NATIONAL_REGION_CODE = "00";
 const COUNTY_LABELS = new Map([
@@ -18,6 +22,8 @@ const COUNTY_LABELS = new Map([
   ["08", "Tel\u0161iai region"],
   ["07", "Taurag\u0117 region"]
 ]);
+
+const BIG_CITY_CODES = new Set(["Vilnius", "Kaunas", "Klaipeda", "Siauliai", "Panevezys"]);
 
 function readKeyValue(block, id) {
   const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -121,6 +127,44 @@ function parseLithuaniaEducationXml(xml, year) {
   ].filter(row => row.population > 0);
 }
 
+function parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year) {
+  let rural = 0;
+  const urbanRuralPattern = /<g:Obs><g:ObsKey>([\s\S]*?)<\/g:ObsKey><g:ObsValue value="([^"]*)"/g;
+  let urbanRuralMatch;
+  while ((urbanRuralMatch = urbanRuralPattern.exec(urbanRuralXml)) !== null) {
+    const keyBlock = urbanRuralMatch[1];
+    if (readKeyValue(keyBlock, "Vietove") !== "2") continue;
+    if (readKeyValue(keyBlock, "Demogr_amziusM3010205") !== "g000g999") continue;
+    if (readKeyValue(keyBlock, "Lytis") !== "0") continue;
+    if (readKeyValue(keyBlock, "MATVNT") !== "asmenys") continue;
+    if (readKeyValue(keyBlock, "LAIKOTARPIS") !== year) continue;
+    rural = Number(urbanRuralMatch[2]) || 0;
+  }
+
+  let cityTotal = 0;
+  let bigCities = 0;
+  const cityTownPattern = /<g:Obs><g:ObsKey>([\s\S]*?)<\/g:ObsKey><g:ObsValue value="([^"]*)"/g;
+  let cityTownMatch;
+  while ((cityTownMatch = cityTownPattern.exec(cityTownXml)) !== null) {
+    const keyBlock = cityTownMatch[1];
+    if (readKeyValue(keyBlock, "Demogr_M3010210") !== "g000g999") continue;
+    if (readKeyValue(keyBlock, "MATVNT") !== "asmenys") continue;
+    if (readKeyValue(keyBlock, "LAIKOTARPIS") !== year) continue;
+
+    const code = readKeyValue(keyBlock, "miestasM3010210_1");
+    const population = Number(cityTownMatch[2]);
+    if (!Number.isFinite(population) || population <= 0) continue;
+    if (code === "TOTAL") cityTotal = population;
+    if (BIG_CITY_CODES.has(code)) bigCities += population;
+  }
+
+  return [
+    { label: "Big cities (Vilnius, Kaunas, Klaip\u0117da, \u0160iauliai, Panev\u0117\u017eys)", population: bigCities },
+    { label: "Other cities", population: Math.max(0, cityTotal - bigCities) },
+    { label: "Rural area", population: rural }
+  ].filter(row => row.population > 0);
+}
+
 export default async function handler(request, response) {
   const year = String(request.query.year || "2024");
 
@@ -140,10 +184,12 @@ export default async function handler(request, response) {
   }
 
   try {
-    const [sourceResponse, nationalityResponse, educationResponse] = await Promise.all([
+    const [sourceResponse, nationalityResponse, educationResponse, urbanRuralResponse, cityTownResponse] = await Promise.all([
       fetch(`${SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`),
       fetch(`${NATIONALITY_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`),
-      fetch(`${EDUCATION_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`)
+      fetch(`${EDUCATION_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`),
+      fetch(`${URBAN_RURAL_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`),
+      fetch(`${CITY_TOWN_SOURCE_URL}?startPeriod=${year}&endPeriod=${year}`)
     ]);
     if (!sourceResponse.ok) {
       response.status(sourceResponse.status).json({ error: `Lithuania OSP returned ${sourceResponse.status}` });
@@ -157,13 +203,24 @@ export default async function handler(request, response) {
       response.status(educationResponse.status).json({ error: `Lithuania OSP education flow returned ${educationResponse.status}` });
       return;
     }
+    if (!urbanRuralResponse.ok) {
+      response.status(urbanRuralResponse.status).json({ error: `Lithuania OSP urban/rural flow returned ${urbanRuralResponse.status}` });
+      return;
+    }
+    if (!cityTownResponse.ok) {
+      response.status(cityTownResponse.status).json({ error: `Lithuania OSP city/town flow returned ${cityTownResponse.status}` });
+      return;
+    }
 
     const xml = await sourceResponse.text();
     const nationalityXml = await nationalityResponse.text();
     const educationXml = await educationResponse.text();
+    const urbanRuralXml = await urbanRuralResponse.text();
+    const cityTownXml = await cityTownResponse.text();
     const rows = parseLithuaniaXml(xml, year);
     const nationalityRows = parseLithuaniaNationalityXml(nationalityXml, year);
     const educationRows = parseLithuaniaEducationXml(educationXml, year);
+    const settlementRows = parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year);
     if (!rows.length) {
       response.status(404).json({ error: "No Lithuania population rows found for this year" });
       return;
@@ -174,12 +231,16 @@ export default async function handler(request, response) {
       flow: FLOW_ID,
       nationalityFlow: NATIONALITY_FLOW_ID,
       educationFlow: EDUCATION_FLOW_ID,
+      urbanRuralFlow: URBAN_RURAL_FLOW_ID,
+      cityTownFlow: CITY_TOWN_FLOW_ID,
       regionalLevel: "counties",
       year,
       rows,
       nationalityRows,
       educationRows,
-      educationSourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R143_M3110116. Whole-country population aged 15+ by educational attainment."
+      settlementRows,
+      educationSourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R143_M3110116. Whole-country population aged 15+ by educational attainment.",
+      settlementSourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flows S3R167_M3010205 and S3R167_M3010210_1. Whole-country settlement-size distribution."
     });
   } catch (error) {
     response.status(502).json({ error: error.message });

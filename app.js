@@ -26,6 +26,8 @@ const ESTONIA_REGION_QUERY_CODES = [
   "37", "784", "39", "44", "49", "51", "57", "59", "65", "67", "70", "74", "78", "82", "84", "86"
 ];
 
+const ESTONIA_SETTLEMENT_CODES = ["784", "H2", "H3", "H4"];
+
 const ESTONIA_REGION_LABELS = {
   784: "Tallinn",
   "37_NO_TALLINN": "Harju maakond (without Tallinn)"
@@ -33,6 +35,12 @@ const ESTONIA_REGION_LABELS = {
 
 const LATVIA_REGION_CODES = [
   "LV00A", "LV00C", "LV00B", "LV009", "LV005"
+];
+
+const LATVIA_SETTLEMENT_TABLE_ID = "IRD081";
+const LATVIA_CAPITAL_CODE = "LV0001000";
+const LATVIA_STATE_CITY_CODES = [
+  "LV0002000", "LV0003000", "LV0031010", "LV0004000", "LV0005000", "LV0040010", "LV0006000", "LV0054010", "LV0007000"
 ];
 
 const LATVIA_REGION_LABELS = {
@@ -51,7 +59,8 @@ const state = {
   rowsForExport: [],
   latestPopulationData: null,
   latestRegionalData: null,
-  latestGeoLabels: {}
+  latestGeoLabels: {},
+  latviaSettlementCodes: null
 };
 
 const els = {
@@ -75,6 +84,9 @@ const els = {
   ageMeta: document.querySelector("#ageMeta"),
   regionSection: document.querySelector("#regionSection"),
   regionTable: document.querySelector("#regionTable"),
+  settlementSection: document.querySelector("#settlementSection"),
+  settlementTable: document.querySelector("#settlementTable"),
+  settlementMeta: document.querySelector("#settlementMeta"),
   nationalitySection: document.querySelector("#nationalitySection"),
   nationalityTable: document.querySelector("#nationalityTable"),
   nationalityMeta: document.querySelector("#nationalityMeta"),
@@ -126,6 +138,12 @@ async function latviaPostSelection(tableId, selection) {
     body: JSON.stringify({ selection })
   });
   if (!response.ok) throw new Error(`Latvia CSB returned ${response.status}`);
+  return response.json();
+}
+
+async function fetchLatviaMetadata(tableId) {
+  const response = await fetch(`${LATVIA_API_BASE}/tables/${tableId}/metadata?lang=en`);
+  if (!response.ok) throw new Error(`Latvia CSB metadata returned ${response.status}`);
   return response.json();
 }
 
@@ -292,6 +310,31 @@ async function fetchEstoniaNationality(year) {
   };
 }
 
+async function fetchEstoniaSettlement(year) {
+  const data = await pxWebPostSelection(ESTONIA_API_BASE, ESTONIA_TABLE_ID, [
+    { code: "Sugu", selection: { filter: "item", values: ["1"] } },
+    { code: "Elukoht", selection: { filter: "item", values: ESTONIA_SETTLEMENT_CODES } },
+    { code: "Aasta", selection: { filter: "item", values: [year] } },
+    { code: "Vanus", selection: { filter: "item", values: ["000"] } }
+  ]);
+  const parsed = parseJsonStat(data);
+  const valueFor = code => lookupValue(parsed, {
+    Sugu: "1",
+    Elukoht: code,
+    Aasta: year,
+    Vanus: "000"
+  }) || 0;
+  return {
+    rows: [
+      { label: "Capital", population: valueFor("784") },
+      { label: "Other urban area", population: Math.max(0, valueFor("H2") - valueFor("784")) },
+      { label: "Small urban area", population: valueFor("H3") },
+      { label: "Rural area", population: valueFor("H4") }
+    ],
+    sourceNote: "Statistics Estonia table RV0240. Tallinn separated from the official urban settlement area."
+  };
+}
+
 async function fetchEstoniaEducation(year) {
   const ageGroupCode = "Vanuser\u00fchm";
   const data = await pxWebPostSelection(ESTONIA_API_BASE, ESTONIA_EDUCATION_TABLE_ID, [
@@ -374,6 +417,58 @@ async function fetchLatviaNationality(year) {
   return {
     rows: ethnicityRows("Latvie\u0161u", "Krievu", "Cita", valueFor("E_LAT"), valueFor("E_RUS"), valueFor("TOTAL")),
     sourceNote: "Central Statistics Bureau of Latvia table IRE010. Whole-country ethnicity distribution."
+  };
+}
+
+async function getLatviaSettlementCodes() {
+  if (state.latviaSettlementCodes) return state.latviaSettlementCodes;
+  const metadata = await fetchLatviaMetadata(LATVIA_SETTLEMENT_TABLE_ID);
+  const labels = metadata.dimension.AREA.category.label || {};
+  const municipalityTownCodes = Object.entries(labels)
+    .filter(([code, label]) => (
+      /^LV\d/.test(code) &&
+      label.startsWith("..") &&
+      !label.startsWith("...") &&
+      !label.includes("(") &&
+      !/rural territory|neighbourhood|unknown/i.test(label) &&
+      code !== LATVIA_CAPITAL_CODE &&
+      !LATVIA_STATE_CITY_CODES.includes(code)
+    ))
+    .map(([code]) => code);
+  const ruralCodes = Object.entries(labels)
+    .filter(([, label]) => /rural territory$/i.test(label))
+    .map(([code]) => code);
+  state.latviaSettlementCodes = { municipalityTownCodes, ruralCodes };
+  return state.latviaSettlementCodes;
+}
+
+async function fetchLatviaSettlement(year) {
+  const { municipalityTownCodes, ruralCodes } = await getLatviaSettlementCodes();
+  const areaCodes = [LATVIA_CAPITAL_CODE, ...LATVIA_STATE_CITY_CODES, ...municipalityTownCodes, ...ruralCodes];
+  const data = await latviaPostSelection(LATVIA_SETTLEMENT_TABLE_ID, [
+    { variableCode: "SEX", valueCodes: ["T"] },
+    { variableCode: "AgeGroup", valueCodes: ["TOTAL"] },
+    { variableCode: "AREA", valueCodes: areaCodes },
+    { variableCode: "ContentsCode", valueCodes: [LATVIA_SETTLEMENT_TABLE_ID] },
+    { variableCode: "TIME", valueCodes: [year] }
+  ]);
+  const parsed = parseJsonStat(data);
+  const valueFor = code => lookupValue(parsed, {
+    SEX: "T",
+    AgeGroup: "TOTAL",
+    AREA: code,
+    ContentsCode: LATVIA_SETTLEMENT_TABLE_ID,
+    TIME: year
+  }) || 0;
+  const sumCodes = codes => codes.reduce((sum, code) => sum + valueFor(code), 0);
+  return {
+    rows: [
+      { label: "Galvaspils\u0113ta", population: valueFor(LATVIA_CAPITAL_CODE) },
+      { label: "Valstspils\u0113ta", population: sumCodes(LATVIA_STATE_CITY_CODES) },
+      { label: "Novada pils\u0113ta", population: sumCodes(municipalityTownCodes) },
+      { label: "Lauki", population: sumCodes(ruralCodes) }
+    ],
+    sourceNote: "Central Statistics Bureau of Latvia table IRD081. Whole-country settlement-size distribution."
   };
 }
 
@@ -463,6 +558,20 @@ async function fetchLithuaniaEducation(year) {
   };
 }
 
+async function fetchLithuaniaSettlement(year) {
+  const response = await fetch(`${LITHUANIA_PROXY_URL}?year=${encodeURIComponent(year)}`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || `Lithuania proxy returned ${response.status}`);
+  }
+  const data = await response.json();
+  if (!data.settlementRows?.length) throw new Error("No Lithuania settlement rows found for this year.");
+  return {
+    rows: data.settlementRows,
+    sourceNote: data.settlementSourceNote || "State Data Agency of Lithuania / Official Statistics Portal settlement-size data."
+  };
+}
+
 async function fetchPopulation(country, year, minAge, maxAge) {
   if (country === "EE") return fetchEstoniaPopulation(year, minAge, maxAge);
   if (country === "LV") return fetchLatviaPopulation(year, minAge, maxAge);
@@ -479,6 +588,12 @@ async function fetchEducation(country, year) {
   if (country === "EE") return fetchEstoniaEducation(year);
   if (country === "LV") return fetchLatviaEducation(year);
   return fetchLithuaniaEducation(year);
+}
+
+async function fetchSettlement(country, year) {
+  if (country === "EE") return fetchEstoniaSettlement(year);
+  if (country === "LV") return fetchLatviaSettlement(year);
+  return fetchLithuaniaSettlement(year);
 }
 
 function aggregateNational(map, sexes, bands) {
@@ -572,12 +687,14 @@ async function buildQuotas() {
   try {
     const ageBands = getAgeBands(minAge, maxAge, grouping);
     const population = await fetchPopulation(country, year, minAge, maxAge);
-    const [nationalityResult, educationResult] = await Promise.allSettled([
+    const [nationalityResult, educationResult, settlementResult] = await Promise.allSettled([
       fetchNationality(country, year),
-      fetchEducation(country, year)
+      fetchEducation(country, year),
+      fetchSettlement(country, year)
     ]);
     const nationality = nationalityResult.status === "fulfilled" ? nationalityResult.value : null;
     const education = educationResult.status === "fulfilled" ? educationResult.value : null;
+    const settlement = settlementResult.status === "fulfilled" ? settlementResult.value : null;
     const national = population.national;
     state.latestPopulationData = national;
     state.latestRegionalData = population.regional;
@@ -625,6 +742,22 @@ async function buildQuotas() {
       }
     } else {
       els.regionSection.hidden = true;
+    }
+
+    if (settlement?.rows?.length) {
+      const visibleSettlementRows = settlement.rows.filter(row => row.population > 0);
+      const settlementRowsForTable = buildQuotaRows(
+        visibleSettlementRows.map(row => row.label),
+        visibleSettlementRows.map(row => row.population),
+        sampleSize
+      );
+      const settlementTotal = visibleSettlementRows.reduce((sum, row) => sum + row.population, 0);
+      renderTable(els.settlementTable, ["Settlement Size", "Population", "%", "Quota"], settlementRowsForTable, ["Total", fmt(settlementTotal), "100.0%", sampleSize]);
+      els.settlementMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${settlement.sourceNote}`;
+      addExportRows("Settlement Size Distribution", ["Settlement Size", "Population", "%", "Quota"], settlementRowsForTable, ["Total", fmt(settlementTotal), "100.0%", sampleSize]);
+      els.settlementSection.hidden = false;
+    } else {
+      els.settlementSection.hidden = true;
     }
 
     if (nationality?.rows?.length) {
