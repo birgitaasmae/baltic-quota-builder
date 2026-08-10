@@ -416,7 +416,11 @@ async function buildQuotas() {
     els.download.disabled = false;
     els.status.textContent = `Built quotas for ${COUNTRY_NAMES[country]} from local statistics bureau data.`;
   } catch (error) {
-    els.status.textContent = error.message;
+    if (country === "LT" && /fetch/i.test(error.message)) {
+      els.status.textContent = "Lithuania uses the local Official Statistics Portal SDMX source, but GitHub Pages cannot fetch that endpoint directly in the browser. This needs a small backend proxy, like the Estonian quota builder.";
+    } else {
+      els.status.textContent = error.message;
+    }
   } finally {
     els.build.disabled = false;
   }
