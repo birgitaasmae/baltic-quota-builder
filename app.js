@@ -83,6 +83,7 @@ const els = {
   estimatedMargin: document.querySelector("#estimatedMargin"),
   results: document.querySelector("#results"),
   sexTable: document.querySelector("#sexTable"),
+  sexMeta: document.querySelector("#sexMeta"),
   ageTable: document.querySelector("#ageTable"),
   ageMeta: document.querySelector("#ageMeta"),
   regionSection: document.querySelector("#regionSection"),
@@ -797,6 +798,7 @@ async function buildQuotas() {
     const sexPopulations = sexes.map(sex => aggregateNational(national, [sex], ageBands));
     const sexRows = buildQuotaRows(sexLabels, sexPopulations, sampleSize);
     renderTable(els.sexTable, ["Sex", "Population", "%", "Quota"], sexRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
+    els.sexMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${population.sourceNote}; selected ages ${minAge}-${maxAge}.`;
     addExportRows("Sex Distribution", ["Sex", "Population", "%", "Quota"], sexRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
 
     const ageLabels = ageBands.map(band => band.label);
