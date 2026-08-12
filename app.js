@@ -833,11 +833,14 @@ function ageCoverageMatchesSelection(coverage, minAge, maxAge) {
 }
 
 function formatMetaHtml(text, minAge, maxAge) {
-  const escaped = escapeHtml(text);
-  return escaped.replace(/Official age groups covering ages ([^.;]+)/g, (match, coverage) => {
+  let html = escapeHtml(text);
+  html = html.replace(/Official age groups covering ages ([^.;]+)/g, (match, coverage) => {
     if (ageCoverageMatchesSelection(coverage, minAge, maxAge)) return match;
     return `<strong>${match}</strong>`;
   });
+  html = html.replace(/Whole-country population aged 15\+/g, "<strong>Whole-country population aged 15+</strong>");
+  html = html.replace(/Whole-country ethnicity distribution/g, "<strong>Whole-country ethnicity distribution</strong>");
+  return html;
 }
 
 function setMeta(target, text, minAge, maxAge) {
