@@ -59,11 +59,11 @@ const LATVIA_STATE_CITY_CODES = [
 ];
 
 const LATVIA_REGION_LABELS = {
-  LV00A: "R\u012bgas statistiskais re\u0123ions",
-  LV00C: "Vidzemes statistiskais re\u0123ions",
-  LV00B: "Kurzemes statistiskais re\u0123ions",
-  LV009: "Zemgales statistiskais re\u0123ions",
-  LV005: "Latgales statistiskais re\u0123ions"
+  LV00A: "Riga statistical region",
+  LV00C: "Vidzeme statistical region",
+  LV00B: "Kurzeme statistical region",
+  LV009: "Zemgale statistical region",
+  LV005: "Latgale statistical region"
 };
 
 const LITHUANIA_REGION_CODES = [
@@ -493,7 +493,7 @@ async function fetchLatviaNationality(year) {
     TIME: year
   });
   return {
-    rows: ethnicityRows("Latvie\u0161u", "Krievu", "Cita", valueFor("E_LAT"), valueFor("E_RUS"), valueFor("TOTAL")),
+    rows: ethnicityRows("Latvian", "Russian", "Other", valueFor("E_LAT"), valueFor("E_RUS"), valueFor("TOTAL")),
     sourceNote: "Central Statistics Bureau of Latvia table IRE010. Whole-country ethnicity distribution."
   };
 }

@@ -13,14 +13,14 @@ const NATIONAL_REGION_CODE = "00";
 const COUNTY_LABELS = new Map([
   ["10", "Vilnius region"],
   ["02", "Kaunas region"],
-  ["03", "Klaip\u0117da region"],
-  ["06", "\u0160iauliai region"],
-  ["05", "Panev\u0117\u017eys region"],
+  ["03", "Klaipeda region"],
+  ["06", "Siauliai region"],
+  ["05", "Panevezys region"],
   ["01", "Alytus region"],
-  ["04", "Marijampol\u0117 region"],
+  ["04", "Marijampole region"],
   ["09", "Utena region"],
-  ["08", "Tel\u0161iai region"],
-  ["07", "Taurag\u0117 region"]
+  ["08", "Telsiai region"],
+  ["07", "Taurage region"]
 ]);
 
 const CAPITAL_CITY_CODE = "Vilnius";
@@ -195,7 +195,7 @@ function parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year, minAge, m
 
   return [
     { label: "Capital (Vilnius)", population: capital },
-    { label: "Big cities (Kaunas, Klaip\u0117da, \u0160iauliai, Panev\u0117\u017eys)", population: bigCities },
+    { label: "Big cities (Kaunas, Klaipeda, Siauliai, Panevezys)", population: bigCities },
     { label: "Other cities", population: Math.max(0, cityTotal - capital - bigCities) },
     { label: "Rural area", population: rural }
   ].filter(row => row.population > 0);
