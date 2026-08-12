@@ -846,7 +846,7 @@ function buildQuotaRows(labels, populations, sampleSize) {
 
 function formatRegionLabel(country, labels, code) {
   const label = labels[code] || code;
-  if (country === "EE") return label;
+  if (country === "EE" || country === "LT") return label;
   return `${label} (${code})`;
 }
 
