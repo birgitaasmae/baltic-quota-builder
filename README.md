@@ -46,7 +46,7 @@ The app will then be available from:
 - Latvia nationality: Central Statistics Bureau table `IRE010`
 - Latvia education: Central Statistics Bureau table `IZT010`
 - Lithuania: State Data Agency / Official Statistics Portal SDMX flow `S3R167_M3010202`
-- Lithuania type of settlement: State Data Agency / Official Statistics Portal SDMX flows `S3R167_M3010205` and `S3R167_M3010210_1`
+- Lithuania type of settlement: State Data Agency / Official Statistics Portal SDMX flows `S3R167_M3010206` and `S3R167_M3010210_1`; uses official age groups that cover the selected age range.
 - Lithuania nationality: State Data Agency / Official Statistics Portal SDMX flow `S3R167_M3010215_1`
 - Lithuania education: State Data Agency / Official Statistics Portal SDMX flow `S3R143_M3110116`
 

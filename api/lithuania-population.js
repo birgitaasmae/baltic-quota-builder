@@ -4,7 +4,7 @@ const NATIONALITY_FLOW_ID = "S3R167_M3010215_1";
 const NATIONALITY_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${NATIONALITY_FLOW_ID}/.`;
 const EDUCATION_FLOW_ID = "S3R143_M3110116";
 const EDUCATION_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${EDUCATION_FLOW_ID}/.`;
-const URBAN_RURAL_FLOW_ID = "S3R167_M3010205";
+const URBAN_RURAL_FLOW_ID = "S3R167_M3010206";
 const URBAN_RURAL_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${URBAN_RURAL_FLOW_ID}/.`;
 const CITY_TOWN_FLOW_ID = "S3R167_M3010210_1";
 const CITY_TOWN_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${CITY_TOWN_FLOW_ID}/.`;
@@ -24,6 +24,24 @@ const COUNTY_LABELS = new Map([
 ]);
 
 const BIG_CITY_CODES = new Set(["Vilnius", "Kaunas", "Klaipeda", "Siauliai", "Panevezys"]);
+const SETTLEMENT_AGE_GROUPS = [
+  { cityCode: "g000g004", ruralCodes: ["g000g004"], from: 0, to: 4 },
+  { cityCode: "g005g009", ruralCodes: ["g005g009"], from: 5, to: 9 },
+  { cityCode: "g010g014", ruralCodes: ["g010g014"], from: 10, to: 14 },
+  { cityCode: "g015g019", ruralCodes: ["g015g019"], from: 15, to: 19 },
+  { cityCode: "g020g024", ruralCodes: ["g020g024"], from: 20, to: 24 },
+  { cityCode: "g025g029", ruralCodes: ["g025g029"], from: 25, to: 29 },
+  { cityCode: "g030g034", ruralCodes: ["g030g034"], from: 30, to: 34 },
+  { cityCode: "g035g039", ruralCodes: ["g035g039"], from: 35, to: 39 },
+  { cityCode: "g040g044", ruralCodes: ["g040g044"], from: 40, to: 44 },
+  { cityCode: "g045g049", ruralCodes: ["g045g049"], from: 45, to: 49 },
+  { cityCode: "g050g054", ruralCodes: ["g050g054"], from: 50, to: 54 },
+  { cityCode: "g055g059", ruralCodes: ["g055g059"], from: 55, to: 59 },
+  { cityCode: "g060g064", ruralCodes: ["g060g064"], from: 60, to: 64 },
+  { cityCode: "g065g069", ruralCodes: ["g065g069"], from: 65, to: 69 },
+  { cityCode: "g070g074", ruralCodes: ["g070g074"], from: 70, to: 74 },
+  { cityCode: "g075", ruralCodes: ["g075g079", "g080g084", "g085"], from: 75, to: 99 }
+];
 
 function readKeyValue(block, id) {
   const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -127,18 +145,32 @@ function parseLithuaniaEducationXml(xml, year) {
   ].filter(row => row.population > 0);
 }
 
-function parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year) {
+function getSettlementAgeGroups(minAge, maxAge) {
+  return SETTLEMENT_AGE_GROUPS.filter(group => group.to >= minAge && group.from <= maxAge);
+}
+
+function describeSettlementAgeCoverage(ageGroups) {
+  if (!ageGroups.length) return "no age groups";
+  const from = ageGroups[0].from;
+  const to = ageGroups[ageGroups.length - 1].to;
+  return `${from}-${to === 99 ? "75+" : to}`;
+}
+
+function parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year, minAge, maxAge) {
+  const ageGroups = getSettlementAgeGroups(minAge, maxAge);
+  const cityAgeCodes = new Set(ageGroups.map(group => group.cityCode));
+  const ruralAgeCodes = new Set(ageGroups.flatMap(group => group.ruralCodes));
   let rural = 0;
   const urbanRuralPattern = /<g:Obs><g:ObsKey>([\s\S]*?)<\/g:ObsKey><g:ObsValue value="([^"]*)"/g;
   let urbanRuralMatch;
   while ((urbanRuralMatch = urbanRuralPattern.exec(urbanRuralXml)) !== null) {
     const keyBlock = urbanRuralMatch[1];
     if (readKeyValue(keyBlock, "Vietove") !== "2") continue;
-    if (readKeyValue(keyBlock, "Demogr_amziusM3010205") !== "g000g999") continue;
+    if (!ruralAgeCodes.has(readKeyValue(keyBlock, "Demogr_amziaus_grM1412"))) continue;
     if (readKeyValue(keyBlock, "Lytis") !== "0") continue;
     if (readKeyValue(keyBlock, "MATVNT") !== "asmenys") continue;
     if (readKeyValue(keyBlock, "LAIKOTARPIS") !== year) continue;
-    rural = Number(urbanRuralMatch[2]) || 0;
+    rural += Number(urbanRuralMatch[2]) || 0;
   }
 
   let cityTotal = 0;
@@ -147,14 +179,14 @@ function parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year) {
   let cityTownMatch;
   while ((cityTownMatch = cityTownPattern.exec(cityTownXml)) !== null) {
     const keyBlock = cityTownMatch[1];
-    if (readKeyValue(keyBlock, "Demogr_M3010210") !== "g000g999") continue;
+    if (!cityAgeCodes.has(readKeyValue(keyBlock, "Demogr_M3010210"))) continue;
     if (readKeyValue(keyBlock, "MATVNT") !== "asmenys") continue;
     if (readKeyValue(keyBlock, "LAIKOTARPIS") !== year) continue;
 
     const code = readKeyValue(keyBlock, "miestasM3010210_1");
     const population = Number(cityTownMatch[2]);
     if (!Number.isFinite(population) || population <= 0) continue;
-    if (code === "TOTAL") cityTotal = population;
+    if (code !== "TOTAL") cityTotal += population;
     if (BIG_CITY_CODES.has(code)) bigCities += population;
   }
 
@@ -167,6 +199,8 @@ function parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year) {
 
 export default async function handler(request, response) {
   const year = String(request.query.year || "2024");
+  const minAge = Number(request.query.minAge ?? 0);
+  const maxAge = Number(request.query.maxAge ?? 99);
 
   response.setHeader("Access-Control-Allow-Origin", "https://birgitaasmae.github.io");
   response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -180,6 +214,10 @@ export default async function handler(request, response) {
 
   if (!/^\d{4}$/.test(year)) {
     response.status(400).json({ error: "Invalid year" });
+    return;
+  }
+  if (!Number.isInteger(minAge) || !Number.isInteger(maxAge) || minAge < 0 || maxAge > 99 || minAge > maxAge) {
+    response.status(400).json({ error: "Invalid age range" });
     return;
   }
 
@@ -216,7 +254,7 @@ export default async function handler(request, response) {
     if (urbanRuralResult.status === "fulfilled" && cityTownResult.status === "fulfilled" && urbanRuralResult.value.ok && cityTownResult.value.ok) {
       const urbanRuralXml = await urbanRuralResult.value.text();
       const cityTownXml = await cityTownResult.value.text();
-      settlementRows = parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year);
+      settlementRows = parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year, minAge, maxAge);
     }
     if (!rows.length) {
       response.status(404).json({ error: "No Lithuania population rows found for this year" });
@@ -237,7 +275,7 @@ export default async function handler(request, response) {
       educationRows,
       settlementRows,
       educationSourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R143_M3110116. Whole-country population aged 15+ by educational attainment.",
-      settlementSourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flows S3R167_M3010205 and S3R167_M3010210_1. Whole-country settlement-size distribution."
+      settlementSourceNote: `State Data Agency of Lithuania / Official Statistics Portal SDMX flows ${URBAN_RURAL_FLOW_ID} and ${CITY_TOWN_FLOW_ID}. Official age groups covering ages ${describeSettlementAgeCoverage(getSettlementAgeGroups(minAge, maxAge))}; city/town flow is not split by sex.`
     });
   } catch (error) {
     response.status(502).json({ error: error.message });

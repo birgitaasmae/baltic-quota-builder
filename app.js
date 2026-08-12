@@ -613,8 +613,13 @@ async function fetchLithuaniaEducation(year) {
   };
 }
 
-async function fetchLithuaniaSettlement(year) {
-  const response = await fetch(`${LITHUANIA_PROXY_URL}?year=${encodeURIComponent(year)}`);
+async function fetchLithuaniaSettlement(year, minAge, maxAge) {
+  const params = new URLSearchParams({
+    year: String(year),
+    minAge: String(minAge),
+    maxAge: String(maxAge)
+  });
+  const response = await fetch(`${LITHUANIA_PROXY_URL}?${params.toString()}`);
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error || `Lithuania proxy returned ${response.status}`);
@@ -648,7 +653,7 @@ async function fetchEducation(country, year) {
 async function fetchSettlement(country, year, minAge, maxAge, sexes) {
   if (country === "EE") return fetchEstoniaSettlement(year, minAge, maxAge, sexes);
   if (country === "LV") return fetchLatviaSettlement(year, minAge, maxAge, sexes);
-  return fetchLithuaniaSettlement(year);
+  return fetchLithuaniaSettlement(year, minAge, maxAge);
 }
 
 function aggregateNational(map, sexes, bands) {
