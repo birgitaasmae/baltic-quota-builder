@@ -191,7 +191,21 @@ function getAgeBands(minAge, maxAge, grouping) {
   if (grouping === 1) return ages;
 
   const bands = [];
-  for (let start = minAge; start <= maxAge; start += grouping) {
+  let start = minAge;
+  if (minAge < 25) {
+    const end = Math.min(24, maxAge);
+    const members = ages.filter(age => age.from >= start && age.to <= end);
+    bands.push({
+      code: `Y${start}-${end}`,
+      from: start,
+      to: end,
+      label: start === end ? String(start) : `${start}-${end}`,
+      members
+    });
+    start = 25;
+  }
+
+  for (; start <= maxAge; start += grouping) {
     const end = Math.min(start + grouping - 1, maxAge);
     const members = ages.filter(age => age.from >= start && age.to <= end);
     bands.push({
