@@ -635,7 +635,7 @@ async function fetchLatviaSettlement(year, minAge, maxAge, sexes) {
       { label: "Other cities", population: sumCodes(municipalityTownCodes) },
       { label: "Rural area", population: sumCodes(ruralCodes) }
     ],
-    sourceNote: `Central Statistics Bureau of Latvia table IRD081. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}; settlement formula follows the Estonian quota builder pattern.`
+    sourceNote: `Central Statistics Bureau of Latvia table IRD081. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`
   };
 }
 

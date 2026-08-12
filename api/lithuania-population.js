@@ -286,7 +286,7 @@ export default async function handler(request, response) {
       populationSourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${POPULATION_SOURCE_TITLE}, SDMX flow ${FLOW_ID}.`,
       nationalitySourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${NATIONALITY_SOURCE_TITLE}, SDMX flow ${NATIONALITY_FLOW_ID}. Whole-country ethnicity distribution.`,
       educationSourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${EDUCATION_SOURCE_TITLE}, SDMX flow ${EDUCATION_FLOW_ID}. Whole-country population aged 15+.`,
-      settlementSourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${SETTLEMENT_URBAN_RURAL_SOURCE_TITLE}, SDMX flow ${URBAN_RURAL_FLOW_ID}; ${SETTLEMENT_CITY_SOURCE_TITLE}, SDMX flow ${CITY_TOWN_FLOW_ID}. Official age groups covering ages ${describeSettlementAgeCoverage(getSettlementAgeGroups(minAge, maxAge))}; settlement formula follows the Estonian quota builder pattern; city/town flow is not split by sex.`
+      settlementSourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${SETTLEMENT_URBAN_RURAL_SOURCE_TITLE}, SDMX flow ${URBAN_RURAL_FLOW_ID}; ${SETTLEMENT_CITY_SOURCE_TITLE}, SDMX flow ${CITY_TOWN_FLOW_ID}. Official age groups covering ages ${describeSettlementAgeCoverage(getSettlementAgeGroups(minAge, maxAge))}.`
     });
   } catch (error) {
     response.status(502).json({ error: error.message });
