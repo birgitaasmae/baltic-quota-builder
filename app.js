@@ -1027,8 +1027,8 @@ async function buildQuotas() {
       }
       const crossRows = buildQuotaRows(labels, crossed, sampleSize);
       renderTable(els.crossTable, ["Cell", "Population", "%", "Quota"], crossRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
-      setMeta(els.crossMeta, `${COUNTRY_NAMES[country]}, ${year}. Source: ${population.sourceNote}; selected ages ${minAge}-${maxAge} crossed by sex.`, minAge, maxAge);
-      addExportRows("Sex x Age Interlocked Quotas", ["Cell", "Population", "%", "Quota"], crossRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
+      setMeta(els.crossMeta, `${COUNTRY_NAMES[country]}, ${year}. Source: ${population.sourceNote}; selected ages ${minAge}-${maxAge} shown as a sex by age cross table.`, minAge, maxAge);
+      addExportRows("Sex x Age Cross Table", ["Cell", "Population", "%", "Quota"], crossRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
       els.crossSection.hidden = false;
     } else {
       els.crossSection.hidden = true;
