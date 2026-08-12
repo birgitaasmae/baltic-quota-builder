@@ -87,6 +87,7 @@ const els = {
   ageMeta: document.querySelector("#ageMeta"),
   regionSection: document.querySelector("#regionSection"),
   regionTable: document.querySelector("#regionTable"),
+  regionMeta: document.querySelector("#regionMeta"),
   settlementSection: document.querySelector("#settlementSection"),
   settlementTable: document.querySelector("#settlementTable"),
   settlementMeta: document.querySelector("#settlementMeta"),
@@ -820,6 +821,7 @@ async function buildQuotas() {
           sampleSize
         );
         renderTable(els.regionTable, ["Region", "Population", "%", "Quota"], regionRows, ["Total", fmt(regionalTotal), "100.0%", sampleSize]);
+        els.regionMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${population.sourceNote}; selected ages ${minAge}-${maxAge}.`;
         addExportRows("Regional Distribution", ["Region", "Population", "%", "Quota"], regionRows, ["Total", fmt(regionalTotal), "100.0%", sampleSize]);
         els.regionSection.hidden = false;
       } else {
