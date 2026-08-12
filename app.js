@@ -26,7 +26,8 @@ const ESTONIA_REGION_QUERY_CODES = [
   "37", "784", "39", "44", "49", "51", "57", "59", "65", "67", "70", "74", "78", "82", "84", "86"
 ];
 
-const ESTONIA_SETTLEMENT_CODES = ["784", "H2", "H3", "H4"];
+const ESTONIA_SETTLEMENT_CODES = ["784", "795", "625", "511", "322", "H2", "H3", "H4"];
+const ESTONIA_BIG_CITY_CODES = ["795", "625", "511", "322"];
 
 const ESTONIA_REGION_LABELS = {
   784: "Tallinn",
@@ -381,14 +382,15 @@ async function fetchEstoniaSettlement(year, minAge, maxAge, sexes) {
     }
     return total;
   };
+  const sumCodes = codes => codes.reduce((sum, code) => sum + valueFor(code), 0);
   return {
     rows: [
-      { label: "Capital", population: valueFor("784") },
-      { label: "Other urban area", population: Math.max(0, valueFor("H2") - valueFor("784")) },
-      { label: "Small urban area", population: valueFor("H3") },
+      { label: "Capital (Tallinn)", population: valueFor("784") },
+      { label: "Big cities (Tartu, P\u00e4rnu, Narva, Kohtla-J\u00e4rve)", population: sumCodes(ESTONIA_BIG_CITY_CODES) },
+      { label: "Other cities", population: Math.max(0, valueFor("H2") + valueFor("H3") - valueFor("784") - sumCodes(ESTONIA_BIG_CITY_CODES)) },
       { label: "Rural area", population: valueFor("H4") }
     ],
-    sourceNote: `Statistics Estonia table RV0240. Exact ages ${minAge}-${maxAge}; Tallinn separated from the official urban settlement area.`
+    sourceNote: `Statistics Estonia table RV0240. Exact ages ${minAge}-${maxAge}; same settlement formula as the Estonian quota builder: capital, big cities, other cities, rural.`
   };
 }
 
@@ -532,12 +534,12 @@ async function fetchLatviaSettlement(year, minAge, maxAge, sexes) {
   const sumCodes = codes => codes.reduce((sum, code) => sum + valueFor(code), 0);
   return {
     rows: [
-      { label: "Galvaspils\u0113ta", population: valueFor(LATVIA_CAPITAL_CODE) },
-      { label: "Valstspils\u0113ta", population: sumCodes(LATVIA_STATE_CITY_CODES) },
-      { label: "Novada pils\u0113ta", population: sumCodes(municipalityTownCodes) },
-      { label: "Lauki", population: sumCodes(ruralCodes) }
+      { label: "Capital (Riga)", population: valueFor(LATVIA_CAPITAL_CODE) },
+      { label: "Big cities (state cities outside Riga)", population: sumCodes(LATVIA_STATE_CITY_CODES) },
+      { label: "Other cities", population: sumCodes(municipalityTownCodes) },
+      { label: "Rural area", population: sumCodes(ruralCodes) }
     ],
-    sourceNote: `Central Statistics Bureau of Latvia table IRD081. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`
+    sourceNote: `Central Statistics Bureau of Latvia table IRD081. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}; settlement formula follows the Estonian quota builder pattern.`
   };
 }
 

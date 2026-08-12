@@ -23,7 +23,8 @@ const COUNTY_LABELS = new Map([
   ["07", "Taurag\u0117 region"]
 ]);
 
-const BIG_CITY_CODES = new Set(["Vilnius", "Kaunas", "Klaipeda", "Siauliai", "Panevezys"]);
+const CAPITAL_CITY_CODE = "Vilnius";
+const BIG_CITY_CODES = new Set(["Kaunas", "Klaipeda", "Siauliai", "Panevezys"]);
 const SETTLEMENT_AGE_GROUPS = [
   { cityCode: "g000g004", ruralCodes: ["g000g004"], from: 0, to: 4 },
   { cityCode: "g005g009", ruralCodes: ["g005g009"], from: 5, to: 9 },
@@ -174,6 +175,7 @@ function parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year, minAge, m
   }
 
   let cityTotal = 0;
+  let capital = 0;
   let bigCities = 0;
   const cityTownPattern = /<g:Obs><g:ObsKey>([\s\S]*?)<\/g:ObsKey><g:ObsValue value="([^"]*)"/g;
   let cityTownMatch;
@@ -187,12 +189,14 @@ function parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year, minAge, m
     const population = Number(cityTownMatch[2]);
     if (!Number.isFinite(population) || population <= 0) continue;
     if (code !== "TOTAL") cityTotal += population;
+    if (code === CAPITAL_CITY_CODE) capital += population;
     if (BIG_CITY_CODES.has(code)) bigCities += population;
   }
 
   return [
-    { label: "Big cities (Vilnius, Kaunas, Klaip\u0117da, \u0160iauliai, Panev\u0117\u017eys)", population: bigCities },
-    { label: "Other cities", population: Math.max(0, cityTotal - bigCities) },
+    { label: "Capital (Vilnius)", population: capital },
+    { label: "Big cities (Kaunas, Klaip\u0117da, \u0160iauliai, Panev\u0117\u017eys)", population: bigCities },
+    { label: "Other cities", population: Math.max(0, cityTotal - capital - bigCities) },
     { label: "Rural area", population: rural }
   ].filter(row => row.population > 0);
 }
@@ -275,7 +279,7 @@ export default async function handler(request, response) {
       educationRows,
       settlementRows,
       educationSourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R143_M3110116. Whole-country population aged 15+ by educational attainment.",
-      settlementSourceNote: `State Data Agency of Lithuania / Official Statistics Portal SDMX flows ${URBAN_RURAL_FLOW_ID} and ${CITY_TOWN_FLOW_ID}. Official age groups covering ages ${describeSettlementAgeCoverage(getSettlementAgeGroups(minAge, maxAge))}; city/town flow is not split by sex.`
+      settlementSourceNote: `State Data Agency of Lithuania / Official Statistics Portal SDMX flows ${URBAN_RURAL_FLOW_ID} and ${CITY_TOWN_FLOW_ID}. Official age groups covering ages ${describeSettlementAgeCoverage(getSettlementAgeGroups(minAge, maxAge))}; settlement formula follows the Estonian quota builder pattern; city/town flow is not split by sex.`
     });
   } catch (error) {
     response.status(502).json({ error: error.message });
