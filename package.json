@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check app.js && node --check src/data-sources/latvia.js && node --check src/data-sources/lithuania.js"
+    "check": "node --check app.js && node --check api/lithuania-population.js && node --check src/data-sources/latvia.js && node --check src/data-sources/lithuania.js && node --check tools/live_data_checks.mjs",
+    "test:live-data": "node tools/live_data_checks.mjs"
   }
 }
