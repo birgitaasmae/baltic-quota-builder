@@ -74,6 +74,7 @@ const els = {
   sexFilter: document.querySelector("#sexFilterSelect"),
   regionLevel: document.querySelector("#regionLevelSelect"),
   settlementLevel: document.querySelector("#settlementLevelSelect"),
+  educationLevel: document.querySelector("#educationLevelSelect"),
   build: document.querySelector("#buildButton"),
   status: document.querySelector("#statusText"),
   summary: document.querySelector("#summaryPanel"),
@@ -751,6 +752,7 @@ async function buildQuotas() {
   const grouping = Number(els.grouping.value);
   const regionLevel = Number(els.regionLevel.value);
   const settlementLevel = Number(els.settlementLevel.value);
+  const educationLevel = Number(els.educationLevel.value);
   const sexes = els.sexFilter.value === "MF" ? ["M", "F"] : [els.sexFilter.value];
 
   if (minAge > maxAge) {
@@ -770,7 +772,7 @@ async function buildQuotas() {
     const population = await fetchPopulation(country, year, minAge, maxAge);
     const [nationalityResult, educationResult, settlementResult] = await Promise.allSettled([
       fetchNationality(country, year),
-      fetchEducation(country, year),
+      educationLevel > 0 ? fetchEducation(country, year) : Promise.resolve(null),
       settlementLevel > 0 ? fetchSettlement(country, year, minAge, maxAge, sexes) : Promise.resolve(null)
     ]);
     const nationality = nationalityResult.status === "fulfilled" ? nationalityResult.value : null;
@@ -860,7 +862,9 @@ async function buildQuotas() {
       els.nationalitySection.hidden = true;
     }
 
-    if (education?.rows?.length) {
+    if (educationLevel <= 0) {
+      els.educationSection.hidden = true;
+    } else if (education?.rows?.length) {
       const educationRowsForTable = buildQuotaRows(
         education.rows.map(row => row.label),
         education.rows.map(row => row.population),
@@ -872,7 +876,9 @@ async function buildQuotas() {
       addExportRows("Education Distribution", ["Education", "Population", "%", "Quota"], educationRowsForTable, ["Total", fmt(educationTotal), "100.0%", sampleSize]);
       els.educationSection.hidden = false;
     } else {
-      els.educationSection.hidden = true;
+      renderNotice(els.educationTable, "Education data is not available from the local statistics source for this selection right now.");
+      els.educationMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Other quota tables are still shown.`;
+      els.educationSection.hidden = false;
     }
 
     if (sexes.length === 2) {

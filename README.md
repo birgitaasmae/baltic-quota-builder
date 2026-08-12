@@ -17,7 +17,7 @@ Open `index.html` in a browser. No build step is required.
 ## What It Does
 
 - Fetches Estonia, Latvia, and Lithuania population data from local official statistics bureau APIs.
-- Calculates sex, age, regional, type-of-settlement, nationality, education, and sex-by-age interlocked quotas.
+- Calculates sex, age, regional, type-of-settlement, nationality, education, and sex-by-age interlocked quotas, with separate show/hide controls for regional, settlement, and education tables.
 - Uses the largest-remainder method so quota totals match the requested sample size.
 - Exports tables as copied TSV or downloaded CSV.
 
