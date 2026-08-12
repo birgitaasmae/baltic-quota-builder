@@ -8,6 +8,11 @@ const URBAN_RURAL_FLOW_ID = "S3R167_M3010206";
 const URBAN_RURAL_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${URBAN_RURAL_FLOW_ID}/.`;
 const CITY_TOWN_FLOW_ID = "S3R167_M3010210_1";
 const CITY_TOWN_SOURCE_URL = `https://osp-rs.stat.gov.lt/rest_xml/data/LSD,${CITY_TOWN_FLOW_ID}/.`;
+const POPULATION_SOURCE_TITLE = "Resident population by sex and age at the beginning of the year";
+const NATIONALITY_SOURCE_TITLE = "Resident population by ethnicity at the beginning of the year";
+const EDUCATION_SOURCE_TITLE = "Population aged 15 and older by educational attainment";
+const SETTLEMENT_URBAN_RURAL_SOURCE_TITLE = "Resident population by urban and rural residence at the beginning of the year";
+const SETTLEMENT_CITY_SOURCE_TITLE = "Resident population in cities and towns at the beginning of the year";
 
 const NATIONAL_REGION_CODE = "00";
 const COUNTY_LABELS = new Map([
@@ -278,8 +283,10 @@ export default async function handler(request, response) {
       nationalityRows,
       educationRows,
       settlementRows,
-      educationSourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R143_M3110116. Whole-country population aged 15+ by educational attainment.",
-      settlementSourceNote: `State Data Agency of Lithuania / Official Statistics Portal SDMX flows ${URBAN_RURAL_FLOW_ID} and ${CITY_TOWN_FLOW_ID}. Official age groups covering ages ${describeSettlementAgeCoverage(getSettlementAgeGroups(minAge, maxAge))}; settlement formula follows the Estonian quota builder pattern; city/town flow is not split by sex.`
+      populationSourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${POPULATION_SOURCE_TITLE}, SDMX flow ${FLOW_ID}.`,
+      nationalitySourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${NATIONALITY_SOURCE_TITLE}, SDMX flow ${NATIONALITY_FLOW_ID}. Whole-country ethnicity distribution.`,
+      educationSourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${EDUCATION_SOURCE_TITLE}, SDMX flow ${EDUCATION_FLOW_ID}. Whole-country population aged 15+.`,
+      settlementSourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${SETTLEMENT_URBAN_RURAL_SOURCE_TITLE}, SDMX flow ${URBAN_RURAL_FLOW_ID}; ${SETTLEMENT_CITY_SOURCE_TITLE}, SDMX flow ${CITY_TOWN_FLOW_ID}. Official age groups covering ages ${describeSettlementAgeCoverage(getSettlementAgeGroups(minAge, maxAge))}; settlement formula follows the Estonian quota builder pattern; city/town flow is not split by sex.`
     });
   } catch (error) {
     response.status(502).json({ error: error.message });

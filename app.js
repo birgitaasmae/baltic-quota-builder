@@ -18,6 +18,11 @@ const LATVIA_NATIONALITY_TABLE_ID = "IRE010";
 const LATVIA_NATIONALITY_AGE_TABLE_ID = "IRE040";
 const LATVIA_EDUCATION_TABLE_ID = "IZT010";
 const LITHUANIA_FLOW_ID = "S3R167_M3010202";
+const LITHUANIA_POPULATION_SOURCE_TITLE = "Resident population by sex and age at the beginning of the year";
+const LITHUANIA_NATIONALITY_SOURCE_TITLE = "Resident population by ethnicity at the beginning of the year";
+const LITHUANIA_EDUCATION_SOURCE_TITLE = "Population aged 15 and older by educational attainment";
+const LITHUANIA_SETTLEMENT_URBAN_RURAL_SOURCE_TITLE = "Resident population by urban and rural residence at the beginning of the year";
+const LITHUANIA_SETTLEMENT_CITY_SOURCE_TITLE = "Resident population in cities and towns at the beginning of the year";
 
 const ESTONIA_REGION_CODES = [
   "784", "37_NO_TALLINN", "39", "44", "49", "51", "57", "59", "65", "67", "70", "74", "78", "82", "84", "86"
@@ -699,7 +704,7 @@ async function fetchLithuaniaPopulation(year) {
     labels,
     regionOrder: LITHUANIA_REGION_CODES,
     nationalRegionCode: "00",
-    sourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R167_M3010202"
+    sourceNote: data.populationSourceNote || `State Data Agency of Lithuania / Official Statistics Portal: ${LITHUANIA_POPULATION_SOURCE_TITLE}, SDMX flow S3R167_M3010202.`
   };
 }
 
@@ -713,7 +718,7 @@ async function fetchLithuaniaNationality(year) {
   if (!data.nationalityRows?.length) throw new Error("No Lithuania nationality rows found for this year.");
   return {
     rows: data.nationalityRows,
-    sourceNote: "State Data Agency of Lithuania / Official Statistics Portal SDMX flow S3R167_M3010215_1. Whole-country ethnicity distribution."
+    sourceNote: data.nationalitySourceNote || `State Data Agency of Lithuania / Official Statistics Portal: ${LITHUANIA_NATIONALITY_SOURCE_TITLE}, SDMX flow S3R167_M3010215_1. Whole-country ethnicity distribution.`
   };
 }
 
@@ -727,7 +732,7 @@ async function fetchLithuaniaEducation(year) {
   if (!data.educationRows?.length) throw new Error("No Lithuania education rows found for this year.");
   return {
     rows: data.educationRows,
-    sourceNote: data.educationSourceNote || "State Data Agency of Lithuania / Official Statistics Portal education data. Whole-country education distribution."
+    sourceNote: data.educationSourceNote || `State Data Agency of Lithuania / Official Statistics Portal: ${LITHUANIA_EDUCATION_SOURCE_TITLE}. Whole-country education distribution.`
   };
 }
 
@@ -746,7 +751,7 @@ async function fetchLithuaniaSettlement(year, minAge, maxAge) {
   if (!data.settlementRows?.length) throw new Error("No Lithuania settlement rows found for this year.");
   return {
     rows: data.settlementRows,
-    sourceNote: data.settlementSourceNote || "State Data Agency of Lithuania / Official Statistics Portal settlement-size data."
+    sourceNote: data.settlementSourceNote || `State Data Agency of Lithuania / Official Statistics Portal: ${LITHUANIA_SETTLEMENT_URBAN_RURAL_SOURCE_TITLE}; ${LITHUANIA_SETTLEMENT_CITY_SOURCE_TITLE}.`
   };
 }
 
