@@ -72,6 +72,7 @@ const els = {
   grouping: document.querySelector("#ageGroupingSelect"),
   sexFilter: document.querySelector("#sexFilterSelect"),
   regionLevel: document.querySelector("#regionLevelSelect"),
+  settlementLevel: document.querySelector("#settlementLevelSelect"),
   build: document.querySelector("#buildButton"),
   status: document.querySelector("#statusText"),
   summary: document.querySelector("#summaryPanel"),
@@ -637,6 +638,10 @@ function renderTable(target, headers, rows, footer = null) {
   target.innerHTML = html;
 }
 
+function renderNotice(target, message) {
+  target.innerHTML = `<p>${message}</p>`;
+}
+
 function addExportRows(section, headers, rows, footer = null) {
   state.rowsForExport.push([section]);
   state.rowsForExport.push(headers);
@@ -670,6 +675,7 @@ async function buildQuotas() {
   const maxAge = Number(els.maxAge.value);
   const grouping = Number(els.grouping.value);
   const regionLevel = Number(els.regionLevel.value);
+  const settlementLevel = Number(els.settlementLevel.value);
   const sexes = els.sexFilter.value === "MF" ? ["M", "F"] : [els.sexFilter.value];
 
   if (minAge > maxAge) {
@@ -690,7 +696,7 @@ async function buildQuotas() {
     const [nationalityResult, educationResult, settlementResult] = await Promise.allSettled([
       fetchNationality(country, year),
       fetchEducation(country, year),
-      fetchSettlement(country, year)
+      settlementLevel > 0 ? fetchSettlement(country, year) : Promise.resolve(null)
     ]);
     const nationality = nationalityResult.status === "fulfilled" ? nationalityResult.value : null;
     const education = educationResult.status === "fulfilled" ? educationResult.value : null;
@@ -744,7 +750,9 @@ async function buildQuotas() {
       els.regionSection.hidden = true;
     }
 
-    if (settlement?.rows?.length) {
+    if (settlementLevel <= 0) {
+      els.settlementSection.hidden = true;
+    } else if (settlement?.rows?.length) {
       const visibleSettlementRows = settlement.rows.filter(row => row.population > 0);
       const settlementRowsForTable = buildQuotaRows(
         visibleSettlementRows.map(row => row.label),
@@ -752,12 +760,14 @@ async function buildQuotas() {
         sampleSize
       );
       const settlementTotal = visibleSettlementRows.reduce((sum, row) => sum + row.population, 0);
-      renderTable(els.settlementTable, ["Settlement Size", "Population", "%", "Quota"], settlementRowsForTable, ["Total", fmt(settlementTotal), "100.0%", sampleSize]);
+      renderTable(els.settlementTable, ["Type of Settlement", "Population", "%", "Quota"], settlementRowsForTable, ["Total", fmt(settlementTotal), "100.0%", sampleSize]);
       els.settlementMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${settlement.sourceNote}`;
-      addExportRows("Settlement Size Distribution", ["Settlement Size", "Population", "%", "Quota"], settlementRowsForTable, ["Total", fmt(settlementTotal), "100.0%", sampleSize]);
+      addExportRows("Type of Settlement Distribution", ["Type of Settlement", "Population", "%", "Quota"], settlementRowsForTable, ["Total", fmt(settlementTotal), "100.0%", sampleSize]);
       els.settlementSection.hidden = false;
     } else {
-      els.settlementSection.hidden = true;
+      renderNotice(els.settlementTable, "Type of settlement data is not available from the local statistics source for this selection right now.");
+      els.settlementMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Region quotas are still shown separately above.`;
+      els.settlementSection.hidden = false;
     }
 
     if (nationality?.rows?.length) {

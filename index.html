@@ -83,6 +83,14 @@
               <option value="3" selected>Local regions where available</option>
             </select>
           </label>
+
+          <label class="field">
+            <span>Settlement Type</span>
+            <select id="settlementLevelSelect">
+              <option value="0">Hide</option>
+              <option value="1" selected>Show separately</option>
+            </select>
+          </label>
         </div>
 
         <div class="actions">
@@ -133,7 +141,7 @@
 
         <article id="settlementSection" class="table-section">
           <div class="table-heading">
-            <h2>Settlement Size Distribution</h2>
+            <h2>Type of Settlement Distribution</h2>
             <p id="settlementMeta">Settlement-size quotas use local statistics bureau territory tables.</p>
           </div>
           <div id="settlementTable"></div>
@@ -165,6 +173,6 @@
       </section>
     </main>
 
-    <script type="module" src="app.js?v=settlement-1"></script>
+    <script type="module" src="app.js?v=settlement-2"></script>
   </body>
 </html>
