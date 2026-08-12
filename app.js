@@ -675,7 +675,7 @@ async function fetchLatviaEducation(year, minAge, maxAge, sexes) {
   };
 }
 
-async function fetchLithuaniaPopulation(year) {
+async function fetchLithuaniaPopulation(year, minAge, maxAge) {
   const response = await fetch(`${LITHUANIA_PROXY_URL}?year=${encodeURIComponent(year)}`);
   if (!response.ok) {
     const body = await response.json().catch(() => null);
@@ -704,7 +704,7 @@ async function fetchLithuaniaPopulation(year) {
     labels,
     regionOrder: LITHUANIA_REGION_CODES,
     nationalRegionCode: "00",
-    sourceNote: data.populationSourceNote || `State Data Agency of Lithuania / Official Statistics Portal: ${LITHUANIA_POPULATION_SOURCE_TITLE}, SDMX flow S3R167_M3010202.`
+    sourceNote: `${data.populationSourceNote || `State Data Agency of Lithuania / Official Statistics Portal: ${LITHUANIA_POPULATION_SOURCE_TITLE}, SDMX flow S3R167_M3010202.`}${maxAge >= 85 ? " Official age groups covering ages 85+." : ""}`
   };
 }
 
@@ -758,7 +758,7 @@ async function fetchLithuaniaSettlement(year, minAge, maxAge) {
 async function fetchPopulation(country, year, minAge, maxAge) {
   if (country === "EE") return fetchEstoniaPopulation(year, minAge, maxAge);
   if (country === "LV") return fetchLatviaPopulation(year, minAge, maxAge);
-  return fetchLithuaniaPopulation(year);
+  return fetchLithuaniaPopulation(year, minAge, maxAge);
 }
 
 async function fetchNationality(country, year, minAge, maxAge, sexes) {
@@ -825,8 +825,7 @@ function renderNotice(target, message) {
 }
 
 function ageCoverageMatchesSelection(coverage, minAge, maxAge) {
-  const plusMatch = coverage.match(/^(\d+)\+$/);
-  if (plusMatch) return Number(plusMatch[1]) === minAge && maxAge >= 99;
+  if (/^\d+\+$/.test(coverage)) return false;
 
   const rangeMatch = coverage.match(/^(\d+)-(\d+)$/);
   if (!rangeMatch) return false;

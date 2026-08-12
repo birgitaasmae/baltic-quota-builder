@@ -228,11 +228,26 @@ async function checkLithuaniaProxy() {
   return `Lithuania proxy ${year} ages 18-74: population total ${nationalTotal}; settlement coverage total ${sum([...settlement.values()])}`;
 }
 
+async function checkLithuaniaOlderAgeEdge() {
+  const year = "2026";
+  const response = await fetch(`${LITHUANIA_PROXY_URL}?year=${year}&minAge=85&maxAge=99`);
+  if (!response.ok) throw new Error(`Lithuania proxy older-age check returned ${response.status}`);
+  const data = await response.json();
+  const nationalOlderRows = data.rows.filter(row => row.regionCode === "00" && row.ageFrom === 85 && row.ageTo === 99);
+  assertEqual(nationalOlderRows.length, 2, "Lithuania 85+ national rows are represented once per sex");
+  assertPositive(sum(nationalOlderRows.map(row => row.population)), "Lithuania 85+ national population");
+
+  const invalidResponse = await fetch(`${LITHUANIA_PROXY_URL}?year=${year}&minAge=85&maxAge=100`);
+  assertEqual(invalidResponse.status, 400, "Lithuania proxy rejects maxAge above 99");
+  return "Lithuania proxy older-age edge: 85+ handled explicitly and maxAge > 99 rejected";
+}
+
 async function main() {
   const checks = [
     checkEstoniaRv0240,
     checkLatviaIrd041,
-    checkLithuaniaProxy
+    checkLithuaniaProxy,
+    checkLithuaniaOlderAgeEdge
   ];
   for (const check of checks) {
     const message = await check();
