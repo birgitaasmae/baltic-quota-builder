@@ -205,6 +205,37 @@ function getAgeBands(minAge, maxAge, grouping) {
   return bands;
 }
 
+function getLatviaSettlementAgeGroups(minAge, maxAge) {
+  const groups = [
+    { code: "Y0-4", from: 0, to: 4 },
+    { code: "Y5-9", from: 5, to: 9 },
+    { code: "Y10-14", from: 10, to: 14 },
+    { code: "Y15-19", from: 15, to: 19 },
+    { code: "Y20-24", from: 20, to: 24 },
+    { code: "Y25-29", from: 25, to: 29 },
+    { code: "Y30-34", from: 30, to: 34 },
+    { code: "Y35-39", from: 35, to: 39 },
+    { code: "Y40-44", from: 40, to: 44 },
+    { code: "Y45-49", from: 45, to: 49 },
+    { code: "Y50-54", from: 50, to: 54 },
+    { code: "Y55-59", from: 55, to: 59 },
+    { code: "Y60-64", from: 60, to: 64 },
+    { code: "Y65-69", from: 65, to: 69 },
+    { code: "Y70-74", from: 70, to: 74 },
+    { code: "Y75-79", from: 75, to: 79 },
+    { code: "Y80-84", from: 80, to: 84 },
+    { code: "Y_GE85", from: 85, to: 99 }
+  ];
+  return groups.filter(group => group.to >= minAge && group.from <= maxAge);
+}
+
+function describeAgeGroupCoverage(groups) {
+  if (!groups.length) return "no age groups";
+  const from = groups[0].from;
+  const to = groups[groups.length - 1].to;
+  return `${from}-${to === 99 ? "85+" : to}`;
+}
+
 function fmt(number) {
   return Math.round(number).toLocaleString("en");
 }
@@ -311,20 +342,31 @@ async function fetchEstoniaNationality(year) {
   };
 }
 
-async function fetchEstoniaSettlement(year) {
+async function fetchEstoniaSettlement(year, minAge, maxAge, sexes) {
+  const ageCodes = [];
+  for (let age = minAge; age <= maxAge; age++) ageCodes.push(String(age));
+  const sexCodes = sexes.length === 2 ? ["1"] : sexes.map(sex => sex === "M" ? "2" : "3");
   const data = await pxWebPostSelection(ESTONIA_API_BASE, ESTONIA_TABLE_ID, [
-    { code: "Sugu", selection: { filter: "item", values: ["1"] } },
+    { code: "Sugu", selection: { filter: "item", values: sexCodes } },
     { code: "Elukoht", selection: { filter: "item", values: ESTONIA_SETTLEMENT_CODES } },
     { code: "Aasta", selection: { filter: "item", values: [year] } },
-    { code: "Vanus", selection: { filter: "item", values: ["000"] } }
+    { code: "Vanus", selection: { filter: "item", values: ageCodes } }
   ]);
   const parsed = parseJsonStat(data);
-  const valueFor = code => lookupValue(parsed, {
-    Sugu: "1",
-    Elukoht: code,
-    Aasta: year,
-    Vanus: "000"
-  }) || 0;
+  const valueFor = code => {
+    let total = 0;
+    for (const sexCode of sexCodes) {
+      for (const ageCode of ageCodes) {
+        total += lookupValue(parsed, {
+          Sugu: sexCode,
+          Elukoht: code,
+          Aasta: year,
+          Vanus: ageCode
+        }) || 0;
+      }
+    }
+    return total;
+  };
   return {
     rows: [
       { label: "Capital", population: valueFor("784") },
@@ -332,7 +374,7 @@ async function fetchEstoniaSettlement(year) {
       { label: "Small urban area", population: valueFor("H3") },
       { label: "Rural area", population: valueFor("H4") }
     ],
-    sourceNote: "Statistics Estonia table RV0240. Tallinn separated from the official urban settlement area."
+    sourceNote: `Statistics Estonia table RV0240. Exact ages ${minAge}-${maxAge}; Tallinn separated from the official urban settlement area.`
   };
 }
 
@@ -443,24 +485,36 @@ async function getLatviaSettlementCodes() {
   return state.latviaSettlementCodes;
 }
 
-async function fetchLatviaSettlement(year) {
+async function fetchLatviaSettlement(year, minAge, maxAge, sexes) {
   const { municipalityTownCodes, ruralCodes } = await getLatviaSettlementCodes();
+  const ageGroups = getLatviaSettlementAgeGroups(minAge, maxAge);
+  if (!ageGroups.length) throw new Error("No Latvia settlement age groups found for this selection.");
+  const ageGroupCodes = ageGroups.map(group => group.code);
+  const sexCodes = sexes.length === 2 ? ["T"] : sexes;
   const areaCodes = [LATVIA_CAPITAL_CODE, ...LATVIA_STATE_CITY_CODES, ...municipalityTownCodes, ...ruralCodes];
   const data = await latviaPostSelection(LATVIA_SETTLEMENT_TABLE_ID, [
-    { variableCode: "SEX", valueCodes: ["T"] },
-    { variableCode: "AgeGroup", valueCodes: ["TOTAL"] },
+    { variableCode: "SEX", valueCodes: sexCodes },
+    { variableCode: "AgeGroup", valueCodes: ageGroupCodes },
     { variableCode: "AREA", valueCodes: areaCodes },
     { variableCode: "ContentsCode", valueCodes: [LATVIA_SETTLEMENT_TABLE_ID] },
     { variableCode: "TIME", valueCodes: [year] }
   ]);
   const parsed = parseJsonStat(data);
-  const valueFor = code => lookupValue(parsed, {
-    SEX: "T",
-    AgeGroup: "TOTAL",
-    AREA: code,
-    ContentsCode: LATVIA_SETTLEMENT_TABLE_ID,
-    TIME: year
-  }) || 0;
+  const valueFor = code => {
+    let total = 0;
+    for (const sexCode of sexCodes) {
+      for (const ageGroupCode of ageGroupCodes) {
+        total += lookupValue(parsed, {
+          SEX: sexCode,
+          AgeGroup: ageGroupCode,
+          AREA: code,
+          ContentsCode: LATVIA_SETTLEMENT_TABLE_ID,
+          TIME: year
+        }) || 0;
+      }
+    }
+    return total;
+  };
   const sumCodes = codes => codes.reduce((sum, code) => sum + valueFor(code), 0);
   return {
     rows: [
@@ -469,7 +523,7 @@ async function fetchLatviaSettlement(year) {
       { label: "Novada pils\u0113ta", population: sumCodes(municipalityTownCodes) },
       { label: "Lauki", population: sumCodes(ruralCodes) }
     ],
-    sourceNote: "Central Statistics Bureau of Latvia table IRD081. Whole-country settlement-size distribution."
+    sourceNote: `Central Statistics Bureau of Latvia table IRD081. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`
   };
 }
 
@@ -591,9 +645,9 @@ async function fetchEducation(country, year) {
   return fetchLithuaniaEducation(year);
 }
 
-async function fetchSettlement(country, year) {
-  if (country === "EE") return fetchEstoniaSettlement(year);
-  if (country === "LV") return fetchLatviaSettlement(year);
+async function fetchSettlement(country, year, minAge, maxAge, sexes) {
+  if (country === "EE") return fetchEstoniaSettlement(year, minAge, maxAge, sexes);
+  if (country === "LV") return fetchLatviaSettlement(year, minAge, maxAge, sexes);
   return fetchLithuaniaSettlement(year);
 }
 
@@ -696,7 +750,7 @@ async function buildQuotas() {
     const [nationalityResult, educationResult, settlementResult] = await Promise.allSettled([
       fetchNationality(country, year),
       fetchEducation(country, year),
-      settlementLevel > 0 ? fetchSettlement(country, year) : Promise.resolve(null)
+      settlementLevel > 0 ? fetchSettlement(country, year, minAge, maxAge, sexes) : Promise.resolve(null)
     ]);
     const nationality = nationalityResult.status === "fulfilled" ? nationalityResult.value : null;
     const education = educationResult.status === "fulfilled" ? educationResult.value : null;

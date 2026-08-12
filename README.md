@@ -42,7 +42,7 @@ The app will then be available from:
 - Estonia nationality: Statistics Estonia table `RV022U`
 - Estonia education: Statistics Estonia table `RV0231U`
 - Latvia: Central Statistics Bureau API v2 table `IRD041`
-- Latvia type of settlement: Central Statistics Bureau table `IRD081`
+- Latvia type of settlement: Central Statistics Bureau table `IRD081`; uses official 5-year age groups that cover the selected age range.
 - Latvia nationality: Central Statistics Bureau table `IRE010`
 - Latvia education: Central Statistics Bureau table `IZT010`
 - Lithuania: State Data Agency / Official Statistics Portal SDMX flow `S3R167_M3010202`
