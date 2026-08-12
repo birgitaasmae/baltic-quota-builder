@@ -31,7 +31,21 @@ const ESTONIA_BIG_CITY_CODES = ["795", "625", "511", "322"];
 
 const ESTONIA_REGION_LABELS = {
   784: "Tallinn",
-  "37_NO_TALLINN": "Harju maakond (without Tallinn)"
+  "37_NO_TALLINN": "Harju maakond (without Tallinn)",
+  39: "Hiiu maakond",
+  44: "Ida-Viru maakond",
+  49: "J\u00f5geva maakond",
+  51: "J\u00e4rva maakond",
+  57: "L\u00e4\u00e4ne maakond",
+  59: "L\u00e4\u00e4ne-Viru maakond",
+  65: "P\u00f5lva maakond",
+  67: "P\u00e4rnu maakond",
+  70: "Rapla maakond",
+  74: "Saare maakond",
+  78: "Tartu maakond",
+  82: "Valga maakond",
+  84: "Viljandi maakond",
+  86: "V\u00f5ru maakond"
 };
 
 const LATVIA_REGION_CODES = [
@@ -742,6 +756,12 @@ function buildQuotaRows(labels, populations, sampleSize) {
   ]);
 }
 
+function formatRegionLabel(country, labels, code) {
+  const label = labels[code] || code;
+  if (country === "EE") return label;
+  return `${label} (${code})`;
+}
+
 function setBusy(isBusy) {
   els.build.disabled = isBusy;
   els.status.textContent = isBusy ? "Fetching population data..." : "Ready.";
@@ -818,7 +838,7 @@ async function buildQuotas() {
       if (nonZero.length) {
         const regionalTotal = nonZero.reduce((sum, row) => sum + row.population, 0);
         const regionRows = buildQuotaRows(
-          nonZero.map(row => `${population.labels[row.code]} (${row.code})`),
+          nonZero.map(row => formatRegionLabel(country, population.labels, row.code)),
           nonZero.map(row => row.population),
           sampleSize
         );
