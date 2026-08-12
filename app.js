@@ -98,6 +98,7 @@ const els = {
   educationMeta: document.querySelector("#educationMeta"),
   crossSection: document.querySelector("#crossSection"),
   crossTable: document.querySelector("#crossTable"),
+  crossMeta: document.querySelector("#crossMeta"),
   copy: document.querySelector("#copyButton"),
   download: document.querySelector("#downloadButton"),
   excel: document.querySelector("#excelButton")
@@ -893,6 +894,7 @@ async function buildQuotas() {
       }
       const crossRows = buildQuotaRows(labels, crossed, sampleSize);
       renderTable(els.crossTable, ["Cell", "Population", "%", "Quota"], crossRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
+      els.crossMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${population.sourceNote}; selected ages ${minAge}-${maxAge} crossed by sex.`;
       addExportRows("Sex x Age Interlocked Quotas", ["Cell", "Population", "%", "Quota"], crossRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
       els.crossSection.hidden = false;
     } else {
