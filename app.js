@@ -15,6 +15,7 @@ const ESTONIA_NATIONALITY_TABLE_ID = "RV022U";
 const ESTONIA_EDUCATION_TABLE_ID = "RV0231U";
 const LATVIA_TABLE_ID = "IRD041";
 const LATVIA_NATIONALITY_TABLE_ID = "IRE010";
+const LATVIA_NATIONALITY_AGE_TABLE_ID = "IRE040";
 const LATVIA_EDUCATION_TABLE_ID = "IZT010";
 const LITHUANIA_FLOW_ID = "S3R167_M3010202";
 
@@ -263,6 +264,51 @@ function getLatviaSettlementAgeGroups(minAge, maxAge) {
   return groups.filter(group => group.to >= minAge && group.from <= maxAge);
 }
 
+function getEstoniaNationalityAgeGroups(minAge, maxAge) {
+  const groups = [
+    { code: "2", from: 0, to: 4 },
+    { code: "3", from: 5, to: 9 },
+    { code: "4", from: 10, to: 14 },
+    { code: "5", from: 15, to: 19 },
+    { code: "6", from: 20, to: 24 },
+    { code: "7", from: 25, to: 29 },
+    { code: "8", from: 30, to: 34 },
+    { code: "9", from: 35, to: 39 },
+    { code: "10", from: 40, to: 44 },
+    { code: "11", from: 45, to: 49 },
+    { code: "12", from: 50, to: 54 },
+    { code: "13", from: 55, to: 59 },
+    { code: "14", from: 60, to: 64 },
+    { code: "15", from: 65, to: 69 },
+    { code: "16", from: 70, to: 74 },
+    { code: "17", from: 75, to: 79 },
+    { code: "18", from: 80, to: 84 },
+    { code: "23", from: 85, to: 99 }
+  ];
+  return groups.filter(group => group.to >= minAge && group.from <= maxAge);
+}
+
+function getEstoniaEducationAgeGroups(minAge, maxAge) {
+  const groups = [
+    { code: "2", from: 15, to: 19 },
+    { code: "3", from: 20, to: 24 },
+    { code: "4", from: 25, to: 29 },
+    { code: "5", from: 30, to: 34 },
+    { code: "6", from: 35, to: 39 },
+    { code: "7", from: 40, to: 44 },
+    { code: "8", from: 45, to: 49 },
+    { code: "9", from: 50, to: 54 },
+    { code: "10", from: 55, to: 59 },
+    { code: "11", from: 60, to: 64 },
+    { code: "12", from: 65, to: 69 },
+    { code: "13", from: 70, to: 74 },
+    { code: "14", from: 75, to: 79 },
+    { code: "15", from: 80, to: 84 },
+    { code: "16", from: 85, to: 99 }
+  ];
+  return groups.filter(group => group.to >= minAge && group.from <= maxAge);
+}
+
 function describeAgeGroupCoverage(groups) {
   if (!groups.length) return "no age groups";
   const from = groups[0].from;
@@ -353,26 +399,37 @@ async function fetchEstoniaPopulation(year, minAge, maxAge) {
   };
 }
 
-async function fetchEstoniaNationality(year) {
+async function fetchEstoniaNationality(year, minAge, maxAge, sexes) {
   const ageGroupCode = "Vanuser\u00fchm";
+  const ageGroups = getEstoniaNationalityAgeGroups(minAge, maxAge);
+  if (!ageGroups.length) throw new Error("No Estonia nationality age groups found for this selection.");
+  const sexCodes = sexes.length === 2 ? ["1"] : sexes.map(sex => sex === "M" ? "2" : "3");
   const data = await pxWebPostSelection(ESTONIA_API_BASE, ESTONIA_NATIONALITY_TABLE_ID, [
     { code: "Aasta", selection: { filter: "item", values: [year] } },
-    { code: ageGroupCode, selection: { filter: "item", values: ["1"] } },
+    { code: ageGroupCode, selection: { filter: "item", values: ageGroups.map(group => group.code) } },
     { code: "Maakond", selection: { filter: "item", values: ["1"] } },
-    { code: "Sugu", selection: { filter: "item", values: ["1"] } },
+    { code: "Sugu", selection: { filter: "item", values: sexCodes } },
     { code: "Rahvus", selection: { filter: "item", values: ["1", "2", "3"] } }
   ]);
   const parsed = parseJsonStat(data);
-  const valueFor = code => lookupValue(parsed, {
-    Aasta: year,
-    [ageGroupCode]: "1",
-    Maakond: "1",
-    Sugu: "1",
-    Rahvus: code
-  });
+  const valueFor = code => {
+    let total = 0;
+    for (const ageGroup of ageGroups) {
+      for (const sexCode of sexCodes) {
+        total += lookupValue(parsed, {
+          Aasta: year,
+          [ageGroupCode]: ageGroup.code,
+          Maakond: "1",
+          Sugu: sexCode,
+          Rahvus: code
+        }) || 0;
+      }
+    }
+    return total;
+  };
   return {
     rows: ethnicityRows("Estonian", "Russian", "Other", valueFor("2"), valueFor("3"), valueFor("1")),
-    sourceNote: "Statistics Estonia table RV022U. Whole-country nationality distribution."
+    sourceNote: `Statistics Estonia table RV022U. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`
   };
 }
 
@@ -413,26 +470,37 @@ async function fetchEstoniaSettlement(year, minAge, maxAge, sexes) {
   };
 }
 
-async function fetchEstoniaEducation(year) {
+async function fetchEstoniaEducation(year, minAge, maxAge, sexes) {
   const ageGroupCode = "Vanuser\u00fchm";
+  const ageGroups = getEstoniaEducationAgeGroups(minAge, maxAge);
+  if (!ageGroups.length) throw new Error("No Estonia education age groups found for this selection.");
+  const sexCodes = sexes.length === 2 ? ["1"] : sexes.map(sex => sex === "M" ? "2" : "3");
   const data = await pxWebPostSelection(ESTONIA_API_BASE, ESTONIA_EDUCATION_TABLE_ID, [
     { code: "Maakond", selection: { filter: "item", values: ["1"] } },
     { code: "Haridustase", selection: { filter: "item", values: ["2", "7", "11", "16"] } },
     { code: "Aasta", selection: { filter: "item", values: [year] } },
-    { code: "Sugu", selection: { filter: "item", values: ["1"] } },
-    { code: ageGroupCode, selection: { filter: "item", values: ["1"] } }
+    { code: "Sugu", selection: { filter: "item", values: sexCodes } },
+    { code: ageGroupCode, selection: { filter: "item", values: ageGroups.map(group => group.code) } }
   ]);
   const parsed = parseJsonStat(data);
-  const valueFor = code => lookupValue(parsed, {
-    Maakond: "1",
-    Haridustase: code,
-    Aasta: year,
-    Sugu: "1",
-    [ageGroupCode]: "1"
-  });
+  const valueFor = code => {
+    let total = 0;
+    for (const sexCode of sexCodes) {
+      for (const ageGroup of ageGroups) {
+        total += lookupValue(parsed, {
+          Maakond: "1",
+          Haridustase: code,
+          Aasta: year,
+          Sugu: sexCode,
+          [ageGroupCode]: ageGroup.code
+        }) || 0;
+      }
+    }
+    return total;
+  };
   return {
     rows: educationRows(valueFor("2"), valueFor("7"), valueFor("11"), valueFor("16")),
-    sourceNote: "Statistics Estonia table RV0231U. Whole-country population aged 15+ by education."
+    sourceNote: `Statistics Estonia table RV0231U. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`
   };
 }
 
@@ -480,21 +548,25 @@ async function fetchLatviaPopulation(year, minAge, maxAge) {
   };
 }
 
-async function fetchLatviaNationality(year) {
-  const data = await latviaPostSelection(LATVIA_NATIONALITY_TABLE_ID, [
+async function fetchLatviaNationality(year, minAge, maxAge) {
+  const ageGroups = getLatviaSettlementAgeGroups(minAge, maxAge);
+  if (!ageGroups.length) throw new Error("No Latvia nationality age groups found for this selection.");
+  const data = await latviaPostSelection(LATVIA_NATIONALITY_AGE_TABLE_ID, [
     { variableCode: "ETHNICITY", valueCodes: ["TOTAL", "E_LAT", "E_RUS"] },
-    { variableCode: "ContentsCode", valueCodes: [LATVIA_NATIONALITY_TABLE_ID] },
+    { variableCode: "AgeGroup", valueCodes: ageGroups.map(group => group.code) },
+    { variableCode: "ContentsCode", valueCodes: [LATVIA_NATIONALITY_AGE_TABLE_ID] },
     { variableCode: "TIME", valueCodes: [year] }
   ]);
   const parsed = parseJsonStat(data);
-  const valueFor = code => lookupValue(parsed, {
+  const valueFor = code => ageGroups.reduce((sum, ageGroup) => sum + (lookupValue(parsed, {
     ETHNICITY: code,
-    ContentsCode: LATVIA_NATIONALITY_TABLE_ID,
+    AgeGroup: ageGroup.code,
+    ContentsCode: LATVIA_NATIONALITY_AGE_TABLE_ID,
     TIME: year
-  });
+  }) || 0), 0);
   return {
     rows: ethnicityRows("Latvian", "Russian", "Other", valueFor("E_LAT"), valueFor("E_RUS"), valueFor("TOTAL")),
-    sourceNote: "Central Statistics Bureau of Latvia table IRE010. Whole-country ethnicity distribution."
+    sourceNote: `Central Statistics Bureau of Latvia table IRE040. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`
   };
 }
 
@@ -562,28 +634,39 @@ async function fetchLatviaSettlement(year, minAge, maxAge, sexes) {
   };
 }
 
-async function fetchLatviaEducation(year) {
+async function fetchLatviaEducation(year, minAge, maxAge, sexes) {
+  const ageGroups = getLatviaSettlementAgeGroups(Math.max(15, minAge), maxAge);
+  if (!ageGroups.length) throw new Error("No Latvia education age groups found for this selection.");
+  const sexCodes = sexes.length === 2 ? ["T"] : sexes;
   const data = await latviaPostSelection(LATVIA_EDUCATION_TABLE_ID, [
     { variableCode: "EDUCATION_LEVEL", valueCodes: ["TOTAL", "ED0", "ED1", "ED2", "ED3", "ED4", "ED5", "ED6", "ED7", "ED8"] },
-    { variableCode: "AgeGroup", valueCodes: ["TOTAL"] },
-    { variableCode: "SEX", valueCodes: ["T"] },
+    { variableCode: "AgeGroup", valueCodes: ageGroups.map(group => group.code) },
+    { variableCode: "SEX", valueCodes: sexCodes },
     { variableCode: "ContentsCode", valueCodes: [LATVIA_EDUCATION_TABLE_ID] },
     { variableCode: "TIME", valueCodes: [year] }
   ]);
   const parsed = parseJsonStat(data);
-  const valueFor = code => lookupValue(parsed, {
-    EDUCATION_LEVEL: code,
-    AgeGroup: "TOTAL",
-    SEX: "T",
-    ContentsCode: LATVIA_EDUCATION_TABLE_ID,
-    TIME: year
-  });
+  const valueFor = code => {
+    let total = 0;
+    for (const sexCode of sexCodes) {
+      for (const ageGroup of ageGroups) {
+        total += lookupValue(parsed, {
+          EDUCATION_LEVEL: code,
+          AgeGroup: ageGroup.code,
+          SEX: sexCode,
+          ContentsCode: LATVIA_EDUCATION_TABLE_ID,
+          TIME: year
+        }) || 0;
+      }
+    }
+    return total;
+  };
   const basic = ["ED0", "ED1", "ED2"].reduce((sum, code) => sum + (valueFor(code) || 0), 0);
   const secondary = ["ED3", "ED4"].reduce((sum, code) => sum + (valueFor(code) || 0), 0);
   const higher = ["ED5", "ED6", "ED7", "ED8"].reduce((sum, code) => sum + (valueFor(code) || 0), 0);
   return {
     rows: educationRows(basic, secondary, higher),
-    sourceNote: "Central Statistics Bureau of Latvia table IZT010. Whole-country population aged 15+ by educational attainment."
+    sourceNote: `Central Statistics Bureau of Latvia table IZT010. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`
   };
 }
 
@@ -673,15 +756,15 @@ async function fetchPopulation(country, year, minAge, maxAge) {
   return fetchLithuaniaPopulation(year);
 }
 
-async function fetchNationality(country, year) {
-  if (country === "EE") return fetchEstoniaNationality(year);
-  if (country === "LV") return fetchLatviaNationality(year);
+async function fetchNationality(country, year, minAge, maxAge, sexes) {
+  if (country === "EE") return fetchEstoniaNationality(year, minAge, maxAge, sexes);
+  if (country === "LV") return fetchLatviaNationality(year, minAge, maxAge);
   return fetchLithuaniaNationality(year);
 }
 
-async function fetchEducation(country, year) {
-  if (country === "EE") return fetchEstoniaEducation(year);
-  if (country === "LV") return fetchLatviaEducation(year);
+async function fetchEducation(country, year, minAge, maxAge, sexes) {
+  if (country === "EE") return fetchEstoniaEducation(year, minAge, maxAge, sexes);
+  if (country === "LV") return fetchLatviaEducation(year, minAge, maxAge, sexes);
   return fetchLithuaniaEducation(year);
 }
 
@@ -795,8 +878,8 @@ async function buildQuotas() {
     const ageBands = getAgeBands(minAge, maxAge, grouping);
     const population = await fetchPopulation(country, year, minAge, maxAge);
     const [nationalityResult, educationResult, settlementResult] = await Promise.allSettled([
-      fetchNationality(country, year),
-      educationLevel > 0 ? fetchEducation(country, year) : Promise.resolve(null),
+      fetchNationality(country, year, minAge, maxAge, sexes),
+      educationLevel > 0 ? fetchEducation(country, year, minAge, maxAge, sexes) : Promise.resolve(null),
       settlementLevel > 0 ? fetchSettlement(country, year, minAge, maxAge, sexes) : Promise.resolve(null)
     ]);
     const nationality = nationalityResult.status === "fulfilled" ? nationalityResult.value : null;

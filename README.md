@@ -39,12 +39,12 @@ The app will then be available from:
 - `api/lithuania-population.js` - serverless proxy for Lithuania OSP SDMX data
 - Estonia: Statistics Estonia table `RV0240`; regional quotas use Tallinn separately and counties, with Harju county calculated without Tallinn.
 - Estonia type of settlement: Statistics Estonia table `RV0240`
-- Estonia nationality: Statistics Estonia table `RV022U`
-- Estonia education: Statistics Estonia table `RV0231U`
+- Estonia nationality: Statistics Estonia table `RV022U`; uses official age groups covering the selected age range.
+- Estonia education: Statistics Estonia table `RV0231U`; uses official 15+ age groups covering the selected age range.
 - Latvia: Central Statistics Bureau API v2 table `IRD041`
 - Latvia type of settlement: Central Statistics Bureau table `IRD081`; uses official 5-year age groups that cover the selected age range.
-- Latvia nationality: Central Statistics Bureau table `IRE010`
-- Latvia education: Central Statistics Bureau table `IZT010`
+- Latvia nationality: Central Statistics Bureau table `IRE040`; uses official 5-year age groups covering the selected age range.
+- Latvia education: Central Statistics Bureau table `IZT010`; uses official 15+ age groups covering the selected age range.
 - Lithuania: State Data Agency / Official Statistics Portal SDMX flow `S3R167_M3010202`
 - Lithuania type of settlement: State Data Agency / Official Statistics Portal SDMX flows `S3R167_M3010206` and `S3R167_M3010210_1`; uses official age groups that cover the selected age range.
 - Lithuania nationality: State Data Agency / Official Statistics Portal SDMX flow `S3R167_M3010215_1`
