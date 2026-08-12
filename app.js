@@ -824,6 +824,27 @@ function renderNotice(target, message) {
   target.innerHTML = `<p>${message}</p>`;
 }
 
+function ageCoverageMatchesSelection(coverage, minAge, maxAge) {
+  const plusMatch = coverage.match(/^(\d+)\+$/);
+  if (plusMatch) return Number(plusMatch[1]) === minAge && maxAge >= 99;
+
+  const rangeMatch = coverage.match(/^(\d+)-(\d+)$/);
+  if (!rangeMatch) return false;
+  return Number(rangeMatch[1]) === minAge && Number(rangeMatch[2]) === maxAge;
+}
+
+function formatMetaHtml(text, minAge, maxAge) {
+  const escaped = escapeHtml(text);
+  return escaped.replace(/Official age groups covering ages ([^.;]+)/g, (match, coverage) => {
+    if (ageCoverageMatchesSelection(coverage, minAge, maxAge)) return match;
+    return `<strong>${match}</strong>`;
+  });
+}
+
+function setMeta(target, text, minAge, maxAge) {
+  target.innerHTML = formatMetaHtml(text, minAge, maxAge);
+}
+
 function addExportRows(section, headers, rows, footer = null) {
   state.rowsForExport.push([section]);
   state.rowsForExport.push(headers);
@@ -906,14 +927,14 @@ async function buildQuotas() {
     const sexPopulations = sexes.map(sex => aggregateNational(national, [sex], ageBands));
     const sexRows = buildQuotaRows(sexLabels, sexPopulations, sampleSize);
     renderTable(els.sexTable, ["Sex", "Population", "%", "Quota"], sexRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
-    els.sexMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${population.sourceNote}; selected ages ${minAge}-${maxAge}.`;
+    setMeta(els.sexMeta, `${COUNTRY_NAMES[country]}, ${year}. Source: ${population.sourceNote}; selected ages ${minAge}-${maxAge}.`, minAge, maxAge);
     addExportRows("Sex Distribution", ["Sex", "Population", "%", "Quota"], sexRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
 
     const ageLabels = ageBands.map(band => band.label);
     const agePopulations = ageBands.map(band => aggregateNational(national, sexes, [band]));
     const ageRows = buildQuotaRows(ageLabels, agePopulations, sampleSize);
     renderTable(els.ageTable, ["Age Group", "Population", "%", "Quota"], ageRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
-    els.ageMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Ages ${minAge}-${maxAge}; ${grouping}-year display grouping. Source: ${population.sourceNote}.`;
+    setMeta(els.ageMeta, `${COUNTRY_NAMES[country]}, ${year}. Ages ${minAge}-${maxAge}; ${grouping}-year display grouping. Source: ${population.sourceNote}.`, minAge, maxAge);
     addExportRows("Age Distribution", ["Age Group", "Population", "%", "Quota"], ageRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
 
     if (regionLevel > 0 && population.regional.size) {
@@ -931,7 +952,7 @@ async function buildQuotas() {
           sampleSize
         );
         renderTable(els.regionTable, ["Region", "Population", "%", "Quota"], regionRows, ["Total", fmt(regionalTotal), "100.0%", sampleSize]);
-        els.regionMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${population.sourceNote}; selected ages ${minAge}-${maxAge}.`;
+        setMeta(els.regionMeta, `${COUNTRY_NAMES[country]}, ${year}. Source: ${population.sourceNote}; selected ages ${minAge}-${maxAge}.`, minAge, maxAge);
         addExportRows("Regional Distribution", ["Region", "Population", "%", "Quota"], regionRows, ["Total", fmt(regionalTotal), "100.0%", sampleSize]);
         els.regionSection.hidden = false;
       } else {
@@ -952,7 +973,7 @@ async function buildQuotas() {
       );
       const settlementTotal = visibleSettlementRows.reduce((sum, row) => sum + row.population, 0);
       renderTable(els.settlementTable, ["Type of Settlement", "Population", "%", "Quota"], settlementRowsForTable, ["Total", fmt(settlementTotal), "100.0%", sampleSize]);
-      els.settlementMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${settlement.sourceNote}`;
+      setMeta(els.settlementMeta, `${COUNTRY_NAMES[country]}, ${year}. Source: ${settlement.sourceNote}`, minAge, maxAge);
       addExportRows("Type of Settlement Distribution", ["Type of Settlement", "Population", "%", "Quota"], settlementRowsForTable, ["Total", fmt(settlementTotal), "100.0%", sampleSize]);
       els.settlementSection.hidden = false;
     } else {
@@ -969,7 +990,7 @@ async function buildQuotas() {
       );
       const nationalityTotal = nationality.rows.reduce((sum, row) => sum + row.population, 0);
       renderTable(els.nationalityTable, ["Nationality", "Population", "%", "Quota"], nationalityRows, ["Total", fmt(nationalityTotal), "100.0%", sampleSize]);
-      els.nationalityMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${nationality.sourceNote}`;
+      setMeta(els.nationalityMeta, `${COUNTRY_NAMES[country]}, ${year}. Source: ${nationality.sourceNote}`, minAge, maxAge);
       addExportRows("Nationality Distribution", ["Nationality", "Population", "%", "Quota"], nationalityRows, ["Total", fmt(nationalityTotal), "100.0%", sampleSize]);
       els.nationalitySection.hidden = false;
     } else {
@@ -986,7 +1007,7 @@ async function buildQuotas() {
       );
       const educationTotal = education.rows.reduce((sum, row) => sum + row.population, 0);
       renderTable(els.educationTable, ["Education", "Population", "%", "Quota"], educationRowsForTable, ["Total", fmt(educationTotal), "100.0%", sampleSize]);
-      els.educationMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${education.sourceNote}`;
+      setMeta(els.educationMeta, `${COUNTRY_NAMES[country]}, ${year}. Source: ${education.sourceNote}`, minAge, maxAge);
       addExportRows("Education Distribution", ["Education", "Population", "%", "Quota"], educationRowsForTable, ["Total", fmt(educationTotal), "100.0%", sampleSize]);
       els.educationSection.hidden = false;
     } else {
@@ -1006,7 +1027,7 @@ async function buildQuotas() {
       }
       const crossRows = buildQuotaRows(labels, crossed, sampleSize);
       renderTable(els.crossTable, ["Cell", "Population", "%", "Quota"], crossRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
-      els.crossMeta.textContent = `${COUNTRY_NAMES[country]}, ${year}. Source: ${population.sourceNote}; selected ages ${minAge}-${maxAge} crossed by sex.`;
+      setMeta(els.crossMeta, `${COUNTRY_NAMES[country]}, ${year}. Source: ${population.sourceNote}; selected ages ${minAge}-${maxAge} crossed by sex.`, minAge, maxAge);
       addExportRows("Sex x Age Interlocked Quotas", ["Cell", "Population", "%", "Quota"], crossRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
       els.crossSection.hidden = false;
     } else {
