@@ -99,7 +99,8 @@ const els = {
   crossSection: document.querySelector("#crossSection"),
   crossTable: document.querySelector("#crossTable"),
   copy: document.querySelector("#copyButton"),
-  download: document.querySelector("#downloadButton")
+  download: document.querySelector("#downloadButton"),
+  excel: document.querySelector("#excelButton")
 };
 
 function ethnicityRows(nativeLabel, russianLabel, otherLabel, nativePopulation, russianPopulation, totalPopulation) {
@@ -901,6 +902,7 @@ async function buildQuotas() {
     els.results.hidden = false;
     els.copy.disabled = false;
     els.download.disabled = false;
+    els.excel.disabled = false;
     els.status.textContent = `Built quotas for ${COUNTRY_NAMES[country]} from local statistics bureau data.`;
   } catch (error) {
     if (country === "LT" && /fetch|proxy/i.test(error.message)) {
@@ -934,6 +936,42 @@ function downloadCsv() {
   URL.revokeObjectURL(url);
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function downloadExcel() {
+  const rows = state.rowsForExport.map(row => (
+    `<tr>${row.map(value => `<td>${escapeHtml(value)}</td>`).join("")}</tr>`
+  )).join("");
+  const workbook = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      table { border-collapse: collapse; font-family: Arial, sans-serif; }
+      td { border: 1px solid #cccccc; padding: 6px 8px; }
+      tr:nth-child(1) td, tr td:first-child:only-child { font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <table>${rows}</table>
+  </body>
+</html>`;
+  const blob = new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${els.country.value.toLowerCase()}-${els.year.value}-quotas.xls`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 els.build.addEventListener("click", buildQuotas);
 els.copy.addEventListener("click", copyTsv);
 els.download.addEventListener("click", downloadCsv);
+els.excel.addEventListener("click", downloadExcel);
