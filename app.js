@@ -1019,18 +1019,30 @@ async function buildQuotas() {
     }
 
     if (sexes.length === 2) {
-      const crossed = [];
-      const labels = [];
-      for (const sex of sexes) {
-        for (const band of ageBands) {
-          labels.push(`${sex === "M" ? "Male" : "Female"} ${band.label}`);
-          crossed.push(aggregateNational(national, [sex], [band]));
-        }
-      }
-      const crossRows = buildQuotaRows(labels, crossed, sampleSize);
-      renderTable(els.crossTable, ["Cell", "Population", "%", "Quota"], crossRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
+      const crossPopulations = ageBands.flatMap(band => sexes.map(sex => aggregateNational(national, [sex], [band])));
+      const crossQuotas = largestRemainder(crossPopulations.map(value => value / totalPopulation), sampleSize);
+      const crossRows = ageBands.map((band, bandIndex) => {
+        const cells = [band.label];
+        sexes.forEach((sex, sexIndex) => {
+          const index = bandIndex * sexes.length + sexIndex;
+          const population = crossPopulations[index];
+          cells.push(fmt(population), pct(population / totalPopulation), crossQuotas[index]);
+        });
+        return cells;
+      });
+      const crossHeaders = ["Age Group", ...sexes.flatMap(sex => {
+        const label = sex === "M" ? "Male" : "Female";
+        return [`${label} Population`, `${label} %`, `${label} Quota`];
+      })];
+      const crossFooter = ["Total"];
+      sexes.forEach((sex, sexIndex) => {
+        const population = ageBands.reduce((sum, _band, bandIndex) => sum + crossPopulations[bandIndex * sexes.length + sexIndex], 0);
+        const quota = ageBands.reduce((sum, _band, bandIndex) => sum + crossQuotas[bandIndex * sexes.length + sexIndex], 0);
+        crossFooter.push(fmt(population), pct(population / totalPopulation), quota);
+      });
+      renderTable(els.crossTable, crossHeaders, crossRows, crossFooter);
       setMeta(els.crossMeta, `${COUNTRY_NAMES[country]}, ${year}. Source: ${population.sourceNote}; selected ages ${minAge}-${maxAge} shown as a sex by age cross table.`, minAge, maxAge);
-      addExportRows("Sex x Age Cross Table", ["Cell", "Population", "%", "Quota"], crossRows, ["Total", fmt(totalPopulation), "100.0%", sampleSize]);
+      addExportRows("Sex x Age Cross Table", crossHeaders, crossRows, crossFooter);
       els.crossSection.hidden = false;
     } else {
       els.crossSection.hidden = true;
