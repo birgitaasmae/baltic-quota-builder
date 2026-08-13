@@ -1,13 +1,14 @@
 :root {
   color-scheme: light;
-  --bg: #f5f7fa;
-  --panel: #ffffff;
-  --text: #18212d;
-  --muted: #5f6b7a;
-  --line: #d8dee8;
-  --accent: #0b6bcb;
-  --accent-dark: #084f95;
-  --soft: #edf4fb;
+  --bg: #f4f1e8;
+  --panel: #fffdf7;
+  --text: #161616;
+  --muted: #5a5a52;
+  --line: #d9d4c6;
+  --accent: #d9ff43;
+  --accent-dark: #bce500;
+  --soft: #eef5d2;
+  --surface: #ebe6d8;
 }
 
 * {
@@ -19,7 +20,7 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Inter, Aptos, "Segoe UI", Arial, Helvetica, sans-serif;
 }
 
 .app-shell {
@@ -62,17 +63,19 @@ p {
 
 h1 {
   font-size: 34px;
+  font-weight: 760;
 }
 
 h2 {
   font-size: 20px;
+  font-weight: 720;
 }
 
 .panel,
 .table-section {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 6px;
 }
 
 .controls {
@@ -97,17 +100,28 @@ h2 {
   grid-column: span 2;
 }
 
+.custom-age-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
 .toggle-field {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
-  gap: 10px;
+  gap: 12px;
   color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .toggle-field input {
   width: auto;
   margin-top: 2px;
+  accent-color: var(--text);
 }
 
 .toggle-field strong,
@@ -127,11 +141,16 @@ select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 10px 12px;
   color: var(--text);
-  background: #fff;
+  background: #fffdf7;
   font: inherit;
+}
+
+input:disabled {
+  color: #77736b;
+  background: var(--surface);
 }
 
 textarea {
@@ -145,9 +164,9 @@ textarea {
 
 button {
   border: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 11px 16px;
-  color: #fff;
+  color: var(--text);
   background: var(--accent);
   font-weight: 700;
   cursor: pointer;
@@ -163,8 +182,8 @@ button:disabled {
 }
 
 button.secondary {
-  color: var(--accent-dark);
-  background: var(--soft);
+  color: var(--text);
+  background: var(--surface);
 }
 
 .status-text {
@@ -234,14 +253,14 @@ td:first-child {
 
 th {
   color: var(--muted);
-  background: #f9fafc;
+  background: var(--surface);
   font-size: 12px;
   text-transform: uppercase;
 }
 
 tfoot td {
   font-weight: 700;
-  background: #f9fafc;
+  background: var(--surface);
 }
 
 [hidden] {
