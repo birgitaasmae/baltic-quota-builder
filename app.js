@@ -1011,10 +1011,16 @@ function selectedFeatureLevel(button) {
   return button.getAttribute("aria-pressed") === "true" ? 1 : 0;
 }
 
+function updateFeatureButtonLabel(button) {
+  const isPressed = button.getAttribute("aria-pressed") === "true";
+  button.textContent = `${button.dataset.label}: ${isPressed ? "On" : "Off"}`;
+}
+
 function toggleFeatureButton(event) {
   const button = event.currentTarget;
   const isPressed = button.getAttribute("aria-pressed") === "true";
   button.setAttribute("aria-pressed", String(!isPressed));
+  updateFeatureButtonLabel(button);
 }
 
 function updateCustomAgeGroupsVisibility() {
@@ -1427,4 +1433,7 @@ els.educationLevel.addEventListener("click", toggleFeatureButton);
 els.copy.addEventListener("click", copyTsv);
 els.download.addEventListener("click", downloadCsv);
 els.excel.addEventListener("click", downloadExcel);
+updateFeatureButtonLabel(els.regionLevel);
+updateFeatureButtonLabel(els.settlementLevel);
+updateFeatureButtonLabel(els.educationLevel);
 updateCustomAgeGroupsVisibility();
