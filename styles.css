@@ -10,6 +10,7 @@
   --soft: #e9faf6;
   --surface: #f7f7f7;
   --border-strong: #111111;
+  --font-sans: "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
 }
 
 * {
@@ -21,7 +22,10 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: Inter, "Helvetica Neue", "Segoe UI", Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 .app-shell {
@@ -51,7 +55,7 @@ body {
   margin: 0 0 8px;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -63,13 +67,15 @@ p {
 }
 
 h1 {
-  font-size: 34px;
+  font-size: 36px;
   font-weight: 800;
+  line-height: 1.1;
 }
 
 h2 {
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 800;
+  line-height: 1.15;
 }
 
 .panel,
@@ -94,7 +100,7 @@ h2 {
   gap: 8px;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .field-wide {
@@ -116,7 +122,7 @@ h2 {
   gap: 12px;
   color: var(--text);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .toggle-field input {
@@ -133,8 +139,8 @@ h2 {
 .toggle-field small {
   margin-top: 4px;
   color: var(--muted);
-  font-weight: 400;
-  line-height: 1.35;
+  font-weight: 300;
+  line-height: 1.5;
 }
 
 input,
@@ -147,6 +153,7 @@ textarea {
   color: var(--text);
   background: #ffffff;
   font: inherit;
+  font-weight: 400;
 }
 
 input:disabled {
@@ -170,6 +177,7 @@ button {
   color: var(--text);
   background: var(--accent);
   font-weight: 700;
+  line-height: 1.5;
   cursor: pointer;
 }
 
@@ -197,6 +205,7 @@ button.secondary:hover {
 .status-text {
   color: var(--muted);
   font-size: 14px;
+  font-weight: 300;
 }
 
 .summary-panel {
@@ -238,13 +247,15 @@ button.secondary:hover {
   max-width: 520px;
   color: var(--muted);
   font-size: 14px;
-  line-height: 1.35;
+  font-weight: 300;
+  line-height: 1.5;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  line-height: 1.5;
 }
 
 th,
@@ -263,6 +274,7 @@ th {
   color: var(--muted);
   background: var(--surface);
   font-size: 12px;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
