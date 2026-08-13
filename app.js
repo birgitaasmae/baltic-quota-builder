@@ -951,8 +951,8 @@ function setMeta(target, text, minAge, maxAge) {
   target.innerHTML = formatMetaHtml(text, minAge, maxAge);
 }
 
-function ageSelectionNote(country, year, minAge, maxAge, sourceNote) {
-  return `${COUNTRY_NAMES[country]}, ${year}. Selected ages ${minAge}-${maxAge}; maximum age ${maxAge}. Source: ${sourceNote}`;
+function sourceNote(country, year, note) {
+  return `${COUNTRY_NAMES[country]}, ${year}. Source: ${note}`;
 }
 
 function addExportRows(section, headers, rows, footer = null, note = null) {
@@ -1052,7 +1052,7 @@ async function buildQuotas() {
     const sexPopulations = sexes.map(sex => aggregateNational(national, [sex], ageBands));
     const sexRows = buildQuotaRows(sexLabels, sexPopulations, sampleSize);
     renderTable(els.sexTable, ["Sex", "Population", "%", "Quota"], sexRows, ["Total", fmt(totalPopulation), totalPercentString(), sampleSize]);
-    const populationNote = ageSelectionNote(country, year, minAge, maxAge, population.sourceNote);
+    const populationNote = sourceNote(country, year, population.sourceNote);
     setMeta(els.sexMeta, populationNote, minAge, maxAge);
     addExportRows("Sex Distribution", ["Sex", "Population", "%", "Quota"], sexRows, ["Total", fmt(totalPopulation), totalPercentString(), sampleSize], populationNote);
 
@@ -1061,7 +1061,7 @@ async function buildQuotas() {
     const ageRows = buildQuotaRows(ageLabels, agePopulations, sampleSize);
     renderTable(els.ageTable, ["Age Group", "Population", "%", "Quota"], ageRows, ["Total", fmt(totalPopulation), totalPercentString(), sampleSize]);
     const groupingNote = customAgeBands ? "custom age groups" : `${grouping}-year display grouping`;
-    const ageNote = `${COUNTRY_NAMES[country]}, ${year}. Selected ages ${minAge}-${maxAge}; maximum age ${maxAge}; ${groupingNote}. Source: ${population.sourceNote}`;
+    const ageNote = `${COUNTRY_NAMES[country]}, ${year}. ${groupingNote}. Source: ${population.sourceNote}`;
     setMeta(els.ageMeta, ageNote, minAge, maxAge);
     addExportRows("Age Distribution", ["Age Group", "Population", "%", "Quota"], ageRows, ["Total", fmt(totalPopulation), totalPercentString(), sampleSize], ageNote);
 
@@ -1101,7 +1101,7 @@ async function buildQuotas() {
       );
       const settlementTotal = visibleSettlementRows.reduce((sum, row) => sum + row.population, 0);
       renderTable(els.settlementTable, ["Type of Settlement", "Population", "%", "Quota"], settlementRowsForTable, ["Total", fmt(settlementTotal), totalPercentString(), sampleSize]);
-      const settlementNote = ageSelectionNote(country, year, minAge, maxAge, settlement.sourceNote);
+      const settlementNote = sourceNote(country, year, settlement.sourceNote);
       setMeta(els.settlementMeta, settlementNote, minAge, maxAge);
       addExportRows("Type of Settlement Distribution", ["Type of Settlement", "Population", "%", "Quota"], settlementRowsForTable, ["Total", fmt(settlementTotal), totalPercentString(), sampleSize], settlementNote);
       els.settlementSection.hidden = false;
@@ -1119,7 +1119,7 @@ async function buildQuotas() {
       );
       const nationalityTotal = nationality.rows.reduce((sum, row) => sum + row.population, 0);
       renderTable(els.nationalityTable, ["Nationality", "Population", "%", "Quota"], nationalityRows, ["Total", fmt(nationalityTotal), totalPercentString(), sampleSize]);
-      const nationalityNote = ageSelectionNote(country, year, minAge, maxAge, nationality.sourceNote);
+      const nationalityNote = sourceNote(country, year, nationality.sourceNote);
       setMeta(els.nationalityMeta, nationalityNote, minAge, maxAge);
       addExportRows("Nationality Distribution", ["Nationality", "Population", "%", "Quota"], nationalityRows, ["Total", fmt(nationalityTotal), totalPercentString(), sampleSize], nationalityNote);
       els.nationalitySection.hidden = false;
@@ -1137,7 +1137,7 @@ async function buildQuotas() {
       );
       const educationTotal = education.rows.reduce((sum, row) => sum + row.population, 0);
       renderTable(els.educationTable, ["Education", "Population", "%", "Quota"], educationRowsForTable, ["Total", fmt(educationTotal), totalPercentString(), sampleSize]);
-      const educationNote = ageSelectionNote(country, year, minAge, maxAge, education.sourceNote);
+      const educationNote = sourceNote(country, year, education.sourceNote);
       setMeta(els.educationMeta, educationNote, minAge, maxAge);
       addExportRows("Education Distribution", ["Education", "Population", "%", "Quota"], educationRowsForTable, ["Total", fmt(educationTotal), totalPercentString(), sampleSize], educationNote);
       els.educationSection.hidden = false;
