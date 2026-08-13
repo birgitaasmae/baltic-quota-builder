@@ -930,6 +930,10 @@ async function buildQuotas() {
     els.status.textContent = "Maximum age must be at least minimum age.";
     return;
   }
+  if (maxAge > 99) {
+    els.status.textContent = "Maximum age must be 99 or lower.";
+    return;
+  }
   if (sampleSize < 10) {
     els.status.textContent = "Sample size must be at least 10.";
     return;
