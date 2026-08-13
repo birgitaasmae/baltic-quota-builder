@@ -93,8 +93,13 @@ h2 {
   font-weight: 700;
 }
 
+.field-wide {
+  grid-column: span 2;
+}
+
 input,
-select {
+select,
+textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -102,6 +107,11 @@ select {
   color: var(--text);
   background: #fff;
   font: inherit;
+}
+
+textarea {
+  min-height: 82px;
+  resize: vertical;
 }
 
 .actions {
@@ -222,6 +232,10 @@ tfoot td {
   .grid,
   .summary-panel {
     grid-template-columns: 1fr;
+  }
+
+  .field-wide {
+    grid-column: span 1;
   }
 
   h1 {

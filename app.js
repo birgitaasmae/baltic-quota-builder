@@ -92,6 +92,8 @@ const els = {
   minAge: document.querySelector("#minAgeInput"),
   maxAge: document.querySelector("#maxAgeInput"),
   grouping: document.querySelector("#ageGroupingSelect"),
+  customAgeGroupsField: document.querySelector("#customAgeGroupsField"),
+  customAgeGroups: document.querySelector("#customAgeGroupsInput"),
   sexFilter: document.querySelector("#sexFilterSelect"),
   regionLevel: document.querySelector("#regionLevelSelect"),
   settlementLevel: document.querySelector("#settlementLevelSelect"),
@@ -245,6 +247,79 @@ function getAgeBands(minAge, maxAge, grouping) {
     });
   }
   return bands;
+}
+
+function getExactAgeMembers(from, to) {
+  const members = [];
+  for (let age = from; age <= to; age++) {
+    members.push({ code: exactAgeCode(age), from: age, to: age, label: String(age) });
+  }
+  return members;
+}
+
+function bandFromRange(from, to) {
+  return {
+    code: `Y${from}-${to}`,
+    from,
+    to,
+    label: from === to ? String(from) : `${from}-${to}`,
+    members: getExactAgeMembers(from, to)
+  };
+}
+
+function bandFromLithuaniaRange(from, to) {
+  const members = [];
+  if (from <= Math.min(to, 84)) members.push(...getExactAgeMembers(from, Math.min(to, 84)));
+  if (to >= 85) members.push({ code: "Y_GE85", from: 85, to: 99, label: "85+ (up to 99 years)", key: "85+" });
+  const label = to >= 85
+    ? (from <= 84 ? `${from}-84 and 85+ (up to 99 years)` : "85+ (up to 99 years)")
+    : (from === to ? String(from) : `${from}-${to}`);
+  return {
+    code: `Y${from}-${to}`,
+    from,
+    to,
+    label,
+    members
+  };
+}
+
+function parseCustomAgeGroups(input, minAge, maxAge, country) {
+  const tokens = input
+    .split(/[\n,;]+/)
+    .map(value => value.trim())
+    .filter(Boolean);
+
+  if (!tokens.length) throw new Error("Enter custom age groups, for example: 16-24, 25-34, 35-44.");
+
+  const ranges = tokens.map(token => {
+    const rangeMatch = token.match(/^(\d{1,2})\s*-\s*(\d{1,2})$/);
+    const plusMatch = token.match(/^(\d{1,2})\+$/);
+    const singleMatch = token.match(/^(\d{1,2})$/);
+    if (rangeMatch) return { from: Number(rangeMatch[1]), to: Number(rangeMatch[2]) };
+    if (plusMatch) return { from: Number(plusMatch[1]), to: maxAge };
+    if (singleMatch) return { from: Number(singleMatch[1]), to: Number(singleMatch[1]) };
+    throw new Error(`Could not read custom age group "${token}". Use ranges like 16-24.`);
+  });
+
+  let expectedFrom = minAge;
+  for (const range of ranges) {
+    if (range.from > range.to) throw new Error(`Custom age group ${range.from}-${range.to} has the start after the end.`);
+    if (range.from < minAge || range.to > maxAge) {
+      throw new Error(`Custom age groups must stay within selected ages ${minAge}-${maxAge}.`);
+    }
+    if (range.from !== expectedFrom) {
+      throw new Error(`Custom age groups must cover every age from ${minAge} to ${maxAge} without gaps or overlaps.`);
+    }
+    expectedFrom = range.to + 1;
+  }
+  if (expectedFrom !== maxAge + 1) {
+    throw new Error(`Custom age groups must end at the selected maximum age ${maxAge}.`);
+  }
+
+  return ranges.map(range => country === "LT"
+    ? bandFromLithuaniaRange(range.from, range.to)
+    : bandFromRange(range.from, range.to)
+  );
 }
 
 function getLithuaniaAgeBands(minAge, maxAge, grouping) {
@@ -914,13 +989,18 @@ function setBusy(isBusy) {
   els.status.textContent = isBusy ? "Fetching population data..." : "Ready.";
 }
 
+function updateCustomAgeGroupsVisibility() {
+  els.customAgeGroupsField.hidden = els.grouping.value !== "custom";
+}
+
 async function buildQuotas() {
   const country = els.country.value;
   const year = els.year.value;
   const sampleSize = Number(els.sampleSize.value);
   const minAge = Number(els.minAge.value);
   const maxAge = Number(els.maxAge.value);
-  const grouping = Number(els.grouping.value);
+  const groupingValue = els.grouping.value;
+  const grouping = groupingValue === "custom" ? null : Number(groupingValue);
   const regionLevel = Number(els.regionLevel.value);
   const settlementLevel = Number(els.settlementLevel.value);
   const educationLevel = Number(els.educationLevel.value);
@@ -943,9 +1023,12 @@ async function buildQuotas() {
   state.rowsForExport = [];
 
   try {
-    let ageBands = getAgeBands(minAge, maxAge, grouping);
-    const population = await fetchPopulation(country, year, minAge, maxAge, grouping);
-    ageBands = population.ageBands || ageBands;
+    const customAgeBands = groupingValue === "custom"
+      ? parseCustomAgeGroups(els.customAgeGroups.value, minAge, maxAge, country)
+      : null;
+    let ageBands = customAgeBands || getAgeBands(minAge, maxAge, grouping);
+    const population = await fetchPopulation(country, year, minAge, maxAge, grouping || 5);
+    ageBands = customAgeBands || population.ageBands || ageBands;
     const [nationalityResult, educationResult, settlementResult] = await Promise.allSettled([
       fetchNationality(country, year, minAge, maxAge, sexes),
       educationLevel > 0 ? fetchEducation(country, year, minAge, maxAge, sexes) : Promise.resolve(null),
@@ -979,7 +1062,8 @@ async function buildQuotas() {
     const agePopulations = ageBands.map(band => aggregateNational(national, sexes, [band]));
     const ageRows = buildQuotaRows(ageLabels, agePopulations, sampleSize);
     renderTable(els.ageTable, ["Age Group", "Population", "%", "Quota"], ageRows, ["Total", fmt(totalPopulation), totalPercentString(), sampleSize]);
-    const ageNote = `${COUNTRY_NAMES[country]}, ${year}. Selected ages ${minAge}-${maxAge}; maximum age ${maxAge}; ${grouping}-year display grouping. Source: ${population.sourceNote}`;
+    const groupingNote = customAgeBands ? "custom age groups" : `${grouping}-year display grouping`;
+    const ageNote = `${COUNTRY_NAMES[country]}, ${year}. Selected ages ${minAge}-${maxAge}; maximum age ${maxAge}; ${groupingNote}. Source: ${population.sourceNote}`;
     setMeta(els.ageMeta, ageNote, minAge, maxAge);
     addExportRows("Age Distribution", ["Age Group", "Population", "%", "Quota"], ageRows, ["Total", fmt(totalPopulation), totalPercentString(), sampleSize], ageNote);
 
@@ -1298,6 +1382,8 @@ function downloadExcel() {
 }
 
 els.build.addEventListener("click", buildQuotas);
+els.grouping.addEventListener("change", updateCustomAgeGroupsVisibility);
 els.copy.addEventListener("click", copyTsv);
 els.download.addEventListener("click", downloadCsv);
 els.excel.addEventListener("click", downloadExcel);
+updateCustomAgeGroupsVisibility();
