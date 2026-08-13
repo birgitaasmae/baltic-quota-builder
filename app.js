@@ -1124,29 +1124,153 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function columnName(index) {
+  let name = "";
+  let value = index + 1;
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    value = Math.floor((value - 1) / 26);
+  }
+  return name;
+}
+
+function worksheetXml(rows) {
+  const body = rows.map((row, rowIndex) => {
+    const cells = row.map((value, colIndex) => {
+      const ref = `${columnName(colIndex)}${rowIndex + 1}`;
+      return `<c r="${ref}" t="inlineStr"><is><t>${escapeHtml(value)}</t></is></c>`;
+    }).join("");
+    return `<row r="${rowIndex + 1}">${cells}</row>`;
+  }).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>${body}</sheetData>
+</worksheet>`;
+}
+
+function crc32(bytes) {
+  let crc = -1;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1));
+  }
+  return (crc ^ -1) >>> 0;
+}
+
+function writeUint16(bytes, value) {
+  bytes.push(value & 0xff, (value >>> 8) & 0xff);
+}
+
+function writeUint32(bytes, value) {
+  bytes.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff);
+}
+
+function createZip(files) {
+  const encoder = new TextEncoder();
+  const chunks = [];
+  const central = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const nameBytes = encoder.encode(file.name);
+    const dataBytes = encoder.encode(file.content);
+    const checksum = crc32(dataBytes);
+    const local = [];
+    writeUint32(local, 0x04034b50);
+    writeUint16(local, 20);
+    writeUint16(local, 0);
+    writeUint16(local, 0);
+    writeUint16(local, 0);
+    writeUint16(local, 0);
+    writeUint32(local, checksum);
+    writeUint32(local, dataBytes.length);
+    writeUint32(local, dataBytes.length);
+    writeUint16(local, nameBytes.length);
+    writeUint16(local, 0);
+    chunks.push(new Uint8Array(local), nameBytes, dataBytes);
+
+    const centralHeader = [];
+    writeUint32(centralHeader, 0x02014b50);
+    writeUint16(centralHeader, 20);
+    writeUint16(centralHeader, 20);
+    writeUint16(centralHeader, 0);
+    writeUint16(centralHeader, 0);
+    writeUint16(centralHeader, 0);
+    writeUint16(centralHeader, 0);
+    writeUint32(centralHeader, checksum);
+    writeUint32(centralHeader, dataBytes.length);
+    writeUint32(centralHeader, dataBytes.length);
+    writeUint16(centralHeader, nameBytes.length);
+    writeUint16(centralHeader, 0);
+    writeUint16(centralHeader, 0);
+    writeUint16(centralHeader, 0);
+    writeUint16(centralHeader, 0);
+    writeUint32(centralHeader, 0);
+    writeUint32(centralHeader, offset);
+    central.push(new Uint8Array(centralHeader), nameBytes);
+    offset += local.length + nameBytes.length + dataBytes.length;
+  }
+
+  const centralSize = central.reduce((sum, part) => sum + part.length, 0);
+  const end = [];
+  writeUint32(end, 0x06054b50);
+  writeUint16(end, 0);
+  writeUint16(end, 0);
+  writeUint16(end, files.length);
+  writeUint16(end, files.length);
+  writeUint32(end, centralSize);
+  writeUint32(end, offset);
+  writeUint16(end, 0);
+
+  return new Blob([...chunks, ...central, new Uint8Array(end)], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  });
+}
+
 function downloadExcel() {
-  const rows = state.rowsForExport.map(row => (
-    `<tr>${row.map(value => `<td>${escapeHtml(value)}</td>`).join("")}</tr>`
-  )).join("");
-  const workbook = `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <style>
-      table { border-collapse: collapse; font-family: Arial, sans-serif; }
-      td { border: 1px solid #cccccc; padding: 6px 8px; }
-      tr:nth-child(1) td, tr td:first-child:only-child { font-weight: bold; }
-    </style>
-  </head>
-  <body>
-    <table>${rows}</table>
-  </body>
-</html>`;
-  const blob = new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const files = [
+    {
+      name: "[Content_Types].xml",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`
+    },
+    {
+      name: "_rels/.rels",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`
+    },
+    {
+      name: "xl/workbook.xml",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="Quotas" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`
+    },
+    {
+      name: "xl/_rels/workbook.xml.rels",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>`
+    },
+    {
+      name: "xl/worksheets/sheet1.xml",
+      content: worksheetXml(state.rowsForExport)
+    }
+  ];
+  const blob = createZip(files);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${els.country.value.toLowerCase()}-${els.year.value}-quotas.xls`;
+  link.download = `${els.country.value.toLowerCase()}-${els.year.value}-quotas.xlsx`;
   link.click();
   URL.revokeObjectURL(url);
 }
