@@ -4,7 +4,10 @@ const LITHUANIA_PROXY_URL = "https://baltic-quota-builder.vercel.app/api/lithuan
 
 const ESTONIA_REGION_QUERY_CODES = ["37", "784", "39", "44", "49", "51", "57", "59", "65", "67", "70", "74", "78", "82", "84", "86"];
 const ESTONIA_REGION_CODES = ["784", "37_NO_TALLINN", "39", "44", "49", "51", "57", "59", "65", "67", "70", "74", "78", "82", "84", "86"];
+const ESTONIA_BIG_CITY_CODES = ["795", "625", "511", "322"];
 const LATVIA_REGION_CODES = ["LV00A", "LV00C", "LV00B", "LV009", "LV005"];
+const LATVIA_CAPITAL_CODE = "LV0001000";
+const LATVIA_STATE_CITY_CODES = ["LV0002000", "LV0003000", "LV0031010", "LV0004000", "LV0005000", "LV0040010", "LV0006000", "LV0054010", "LV0007000"];
 const LITHUANIA_REGION_CODES = ["10", "02", "03", "06", "05", "01", "04", "09", "08", "07"];
 
 function exactAgeCode(age) {
@@ -58,6 +61,12 @@ async function latviaPostSelection(tableId, selection) {
   return response.json();
 }
 
+async function latviaMetadata(tableId) {
+  const response = await fetch(`${LATVIA_API_BASE}/tables/${tableId}/metadata?lang=en`);
+  if (!response.ok) throw new Error(`Latvia ${tableId} metadata returned ${response.status}`);
+  return response.json();
+}
+
 function assertEqual(actual, expected, label) {
   if (actual !== expected) throw new Error(`${label}: expected ${expected}, got ${actual}`);
 }
@@ -91,6 +100,53 @@ function assertQuotaSum(populations, sampleSize, label) {
   const total = sum(populations);
   const quotas = largestRemainder(populations.map(value => value / total), sampleSize);
   assertEqual(sum(quotas), sampleSize, label);
+}
+
+function educationRowsForCalculation(rows) {
+  return rows.filter(row => !/\b(other|unknown|not stated|not specified)\b/i.test(row.label || "") && row.population > 0);
+}
+
+function estoniaEducationAgeGroups(minAge, maxAge) {
+  return [
+    { code: "2", from: 15, to: 19 },
+    { code: "3", from: 20, to: 24 },
+    { code: "4", from: 25, to: 29 },
+    { code: "5", from: 30, to: 34 },
+    { code: "6", from: 35, to: 39 },
+    { code: "7", from: 40, to: 44 },
+    { code: "8", from: 45, to: 49 },
+    { code: "9", from: 50, to: 54 },
+    { code: "10", from: 55, to: 59 },
+    { code: "11", from: 60, to: 64 },
+    { code: "12", from: 65, to: 69 },
+    { code: "13", from: 70, to: 74 },
+    { code: "14", from: 75, to: 79 },
+    { code: "15", from: 80, to: 84 },
+    { code: "16", from: 85, to: 99 }
+  ].filter(group => group.to >= minAge && group.from <= maxAge);
+}
+
+function latviaGroupedAges(minAge, maxAge) {
+  return [
+    { code: "Y0-4", from: 0, to: 4 },
+    { code: "Y5-9", from: 5, to: 9 },
+    { code: "Y10-14", from: 10, to: 14 },
+    { code: "Y15-19", from: 15, to: 19 },
+    { code: "Y20-24", from: 20, to: 24 },
+    { code: "Y25-29", from: 25, to: 29 },
+    { code: "Y30-34", from: 30, to: 34 },
+    { code: "Y35-39", from: 35, to: 39 },
+    { code: "Y40-44", from: 40, to: 44 },
+    { code: "Y45-49", from: 45, to: 49 },
+    { code: "Y50-54", from: 50, to: 54 },
+    { code: "Y55-59", from: 55, to: 59 },
+    { code: "Y60-64", from: 60, to: 64 },
+    { code: "Y65-69", from: 65, to: 69 },
+    { code: "Y70-74", from: 70, to: 74 },
+    { code: "Y75-79", from: 75, to: 79 },
+    { code: "Y80-84", from: 80, to: 84 },
+    { code: "Y_GE85", from: 85, to: 99 }
+  ].filter(group => group.to >= minAge && group.from <= maxAge);
 }
 
 async function checkEstoniaRv0240() {
@@ -136,6 +192,107 @@ async function checkEstoniaRv0240() {
   assertPositive(total, "Estonia RV0240 national 18-74 total");
   assertEqual(regionalTotal, total, "Estonia RV0240 counties + Tallinn equal national total");
   return `Estonia RV0240 ${year} ages ${minAge}-${maxAge}: total ${total}`;
+}
+
+async function checkEstoniaSettlementNationalityEducation() {
+  const year = "2025";
+  const minAge = 18;
+  const maxAge = 74;
+  const sexes = ["2", "3"];
+  const exactAgeCodes = [];
+  for (let age = minAge; age <= maxAge; age++) exactAgeCodes.push(String(age));
+
+  const settlementData = await pxWebPostSelection(ESTONIA_API_BASE, "RV0240", [
+    { code: "Sugu", selection: { filter: "item", values: sexes } },
+    { code: "Elukoht", selection: { filter: "item", values: ["784", "795", "625", "511", "322", "H2", "H3", "H4"] } },
+    { code: "Aasta", selection: { filter: "item", values: [year] } },
+    { code: "Vanus", selection: { filter: "item", values: exactAgeCodes } }
+  ]);
+  const settlementParsed = parseJsonStat(settlementData);
+  const settlementValue = code => {
+    let total = 0;
+    for (const sex of sexes) {
+      for (const age of exactAgeCodes) {
+        total += lookupValue(settlementParsed, { Sugu: sex, Elukoht: code, Aasta: year, Vanus: age }) || 0;
+      }
+    }
+    return total;
+  };
+  const estoniaSettlementRows = [
+    settlementValue("784"),
+    sum(ESTONIA_BIG_CITY_CODES.map(settlementValue)),
+    Math.max(0, settlementValue("H2") + settlementValue("H3") - settlementValue("784") - sum(ESTONIA_BIG_CITY_CODES.map(settlementValue))),
+    settlementValue("H4")
+  ];
+  assertPositive(sum(estoniaSettlementRows), "Estonia RV0240 settlement total");
+  assertQuotaSum(estoniaSettlementRows, 1000, "Estonia settlement quotas sum to sample size");
+
+  const nationalityAgeGroups = [
+    { code: "5", from: 15, to: 19 },
+    { code: "6", from: 20, to: 24 },
+    { code: "7", from: 25, to: 29 },
+    { code: "8", from: 30, to: 34 },
+    { code: "9", from: 35, to: 39 },
+    { code: "10", from: 40, to: 44 },
+    { code: "11", from: 45, to: 49 },
+    { code: "12", from: 50, to: 54 },
+    { code: "13", from: 55, to: 59 },
+    { code: "14", from: 60, to: 64 },
+    { code: "15", from: 65, to: 69 },
+    { code: "16", from: 70, to: 74 }
+  ];
+  const nationalityData = await pxWebPostSelection(ESTONIA_API_BASE, "RV022U", [
+    { code: "Rahvus", selection: { filter: "item", values: ["1", "2", "3"] } },
+    { code: "Aasta", selection: { filter: "item", values: [year] } },
+    { code: "Sugu", selection: { filter: "item", values: sexes } },
+    { code: "Vanuserühm", selection: { filter: "item", values: nationalityAgeGroups.map(group => group.code) } }
+  ]);
+  const nationalityParsed = parseJsonStat(nationalityData);
+  const nationalityValue = code => {
+    let total = 0;
+    for (const sex of sexes) {
+      for (const ageGroup of nationalityAgeGroups) {
+        total += lookupValue(nationalityParsed, { Rahvus: code, Aasta: year, Sugu: sex, "Vanuserühm": ageGroup.code }) || 0;
+      }
+    }
+    return total;
+  };
+  const estonian = nationalityValue("2");
+  const russian = nationalityValue("3");
+  const nationalityTotal = nationalityValue("1");
+  assertPositive(nationalityTotal, "Estonia RV022U nationality total");
+  assertEqual(estonian + russian <= nationalityTotal, true, "Estonia nationality named groups do not exceed total");
+  assertQuotaSum([estonian, russian, nationalityTotal - estonian - russian], 1000, "Estonia nationality quotas sum to sample size");
+
+  const educationAgeGroups = estoniaEducationAgeGroups(minAge, maxAge);
+  const educationData = await pxWebPostSelection(ESTONIA_API_BASE, "RV0231U", [
+    { code: "Maakond", selection: { filter: "item", values: ["1"] } },
+    { code: "Haridustase", selection: { filter: "item", values: ["2", "7", "11", "16"] } },
+    { code: "Aasta", selection: { filter: "item", values: [year] } },
+    { code: "Sugu", selection: { filter: "item", values: sexes } },
+    { code: "Vanuserühm", selection: { filter: "item", values: educationAgeGroups.map(group => group.code) } }
+  ]);
+  const educationParsed = parseJsonStat(educationData);
+  const educationValue = code => {
+    let total = 0;
+    for (const sex of sexes) {
+      for (const ageGroup of educationAgeGroups) {
+        total += lookupValue(educationParsed, { Maakond: "1", Haridustase: code, Aasta: year, Sugu: sex, "Vanuserühm": ageGroup.code }) || 0;
+      }
+    }
+    return total;
+  };
+  const rawEducationRows = [
+    { label: "Basic or lower", population: educationValue("2") },
+    { label: "Secondary", population: educationValue("7") },
+    { label: "Higher", population: educationValue("11") },
+    { label: "Other or unknown", population: educationValue("16") }
+  ];
+  const calculatedEducationRows = educationRowsForCalculation(rawEducationRows);
+  assertEqual(calculatedEducationRows.some(row => /other|unknown/i.test(row.label)), false, "Estonia education excludes other or unknown");
+  assertPositive(sum(calculatedEducationRows.map(row => row.population)), "Estonia RV0231U education calculated total");
+  assertQuotaSum(calculatedEducationRows.map(row => row.population), 1000, "Estonia education quotas sum to sample size after exclusion");
+  return `Estonia settlement, nationality, education source checks passed for ${year}`;
 }
 
 async function checkLatviaIrd041() {
@@ -185,6 +342,101 @@ async function checkLatviaIrd041() {
   return `Latvia IRD041 ${year} ages ${minAge}-${maxAge}: total ${national}`;
 }
 
+async function checkLatviaSettlementNationalityEducation() {
+  const year = "2025";
+  const minAge = 18;
+  const maxAge = 74;
+  const ageGroups = latviaGroupedAges(minAge, maxAge);
+
+  const metadata = await latviaMetadata("IRD081");
+  const labels = metadata.dimension.AREA.category.label || {};
+  const municipalityTownCodes = Object.entries(labels)
+    .filter(([code, label]) => (
+      /^LV\d/.test(code) &&
+      label.startsWith("..") &&
+      !label.startsWith("...") &&
+      !label.includes("(") &&
+      !/rural territory|neighbourhood|unknown/i.test(label) &&
+      code !== LATVIA_CAPITAL_CODE &&
+      !LATVIA_STATE_CITY_CODES.includes(code)
+    ))
+    .map(([code]) => code);
+  const ruralCodes = Object.entries(labels)
+    .filter(([, label]) => /rural territory$/i.test(label))
+    .map(([code]) => code);
+  assertPositive(municipalityTownCodes.length, "Latvia IRD081 municipality-town code count");
+  assertPositive(ruralCodes.length, "Latvia IRD081 rural code count");
+
+  const settlementAreaCodes = [LATVIA_CAPITAL_CODE, ...LATVIA_STATE_CITY_CODES, ...municipalityTownCodes, ...ruralCodes];
+  const settlementData = await latviaPostSelection("IRD081", [
+    { variableCode: "SEX", valueCodes: ["T"] },
+    { variableCode: "AgeGroup", valueCodes: ageGroups.map(group => group.code) },
+    { variableCode: "AREA", valueCodes: settlementAreaCodes },
+    { variableCode: "ContentsCode", valueCodes: ["IRD081"] },
+    { variableCode: "TIME", valueCodes: [year] }
+  ]);
+  const settlementParsed = parseJsonStat(settlementData);
+  const settlementValue = code => sum(ageGroups.map(ageGroup => lookupValue(settlementParsed, {
+    SEX: "T",
+    AgeGroup: ageGroup.code,
+    AREA: code,
+    ContentsCode: "IRD081",
+    TIME: year
+  }) || 0));
+  const latviaSettlementRows = [
+    settlementValue(LATVIA_CAPITAL_CODE),
+    sum(LATVIA_STATE_CITY_CODES.map(settlementValue)),
+    sum(municipalityTownCodes.map(settlementValue)),
+    sum(ruralCodes.map(settlementValue))
+  ];
+  assertPositive(sum(latviaSettlementRows), "Latvia IRD081 settlement total");
+  assertQuotaSum(latviaSettlementRows, 1000, "Latvia settlement quotas sum to sample size");
+
+  const nationalityData = await latviaPostSelection("IRE040", [
+    { variableCode: "ETHNICITY", valueCodes: ["TOTAL", "E_LAT", "E_RUS"] },
+    { variableCode: "AgeGroup", valueCodes: ageGroups.map(group => group.code) },
+    { variableCode: "ContentsCode", valueCodes: ["IRE040"] },
+    { variableCode: "TIME", valueCodes: [year] }
+  ]);
+  const nationalityParsed = parseJsonStat(nationalityData);
+  const nationalityValue = code => sum(ageGroups.map(ageGroup => lookupValue(nationalityParsed, {
+    ETHNICITY: code,
+    AgeGroup: ageGroup.code,
+    ContentsCode: "IRE040",
+    TIME: year
+  }) || 0));
+  const latvian = nationalityValue("E_LAT");
+  const russian = nationalityValue("E_RUS");
+  const nationalityTotal = nationalityValue("TOTAL");
+  assertPositive(nationalityTotal, "Latvia IRE040 nationality total");
+  assertEqual(latvian + russian <= nationalityTotal, true, "Latvia nationality named groups do not exceed total");
+  assertQuotaSum([latvian, russian, nationalityTotal - latvian - russian], 1000, "Latvia nationality quotas sum to sample size");
+
+  const educationData = await latviaPostSelection("IZT010", [
+    { variableCode: "EDUCATION_LEVEL", valueCodes: ["ED0", "ED1", "ED2", "ED3", "ED4", "ED5", "ED6", "ED7", "ED8"] },
+    { variableCode: "AgeGroup", valueCodes: ageGroups.map(group => group.code) },
+    { variableCode: "SEX", valueCodes: ["T"] },
+    { variableCode: "ContentsCode", valueCodes: ["IZT010"] },
+    { variableCode: "TIME", valueCodes: [year] }
+  ]);
+  const educationParsed = parseJsonStat(educationData);
+  const educationValue = code => sum(ageGroups.map(ageGroup => lookupValue(educationParsed, {
+    EDUCATION_LEVEL: code,
+    AgeGroup: ageGroup.code,
+    SEX: "T",
+    ContentsCode: "IZT010",
+    TIME: year
+  }) || 0));
+  const calculatedEducationRows = educationRowsForCalculation([
+    { label: "Basic or lower", population: sum(["ED0", "ED1", "ED2"].map(educationValue)) },
+    { label: "Secondary", population: sum(["ED3", "ED4"].map(educationValue)) },
+    { label: "Higher", population: sum(["ED5", "ED6", "ED7", "ED8"].map(educationValue)) }
+  ]);
+  assertPositive(sum(calculatedEducationRows.map(row => row.population)), "Latvia IZT010 education calculated total");
+  assertQuotaSum(calculatedEducationRows.map(row => row.population), 1000, "Latvia education quotas sum to sample size");
+  return `Latvia settlement, nationality, education source checks passed for ${year}`;
+}
+
 async function checkLithuaniaProxy() {
   const year = "2026";
   const response = await fetch(`${LITHUANIA_PROXY_URL}?year=${year}&minAge=18&maxAge=74`);
@@ -225,7 +477,23 @@ async function checkLithuaniaProxy() {
   assertQuotaSum(regionalTotals, 3000, "Lithuania regional quotas sum to sample size");
   assertQuotaSum([...settlement.values()], 3000, "Lithuania settlement quotas sum to sample size");
 
+  const nationalityRows = data.nationalityRows || [];
+  assertPositive(sum(nationalityRows.map(row => row.population)), "Lithuania nationality proxy total");
+  assertQuotaSum(nationalityRows.map(row => row.population), 3000, "Lithuania nationality quotas sum to sample size");
+
   return `Lithuania proxy ${year} ages 18-74: population total ${nationalTotal}; settlement coverage total ${sum([...settlement.values()])}`;
+}
+
+async function checkLithuaniaEducationLatestAvailable() {
+  const year = "2025";
+  const response = await fetch(`${LITHUANIA_PROXY_URL}?year=${year}&minAge=18&maxAge=74`);
+  if (!response.ok) throw new Error(`Lithuania proxy education check returned ${response.status}`);
+  const data = await response.json();
+  const educationRows = educationRowsForCalculation(data.educationRows || []);
+  assertEqual(educationRows.some(row => /other|unknown/i.test(row.label)), false, "Lithuania education excludes other or unknown");
+  assertPositive(sum(educationRows.map(row => row.population)), "Lithuania education proxy calculated total");
+  assertQuotaSum(educationRows.map(row => row.population), 3000, "Lithuania education quotas sum to sample size after exclusion");
+  return `Lithuania education proxy ${year}: latest available education rows checked after exclusion`;
 }
 
 async function checkLithuaniaOlderAgeEdge() {
@@ -245,8 +513,11 @@ async function checkLithuaniaOlderAgeEdge() {
 async function main() {
   const checks = [
     checkEstoniaRv0240,
+    checkEstoniaSettlementNationalityEducation,
     checkLatviaIrd041,
+    checkLatviaSettlementNationalityEducation,
     checkLithuaniaProxy,
+    checkLithuaniaEducationLatestAvailable,
     checkLithuaniaOlderAgeEdge
   ];
   for (const check of checks) {
