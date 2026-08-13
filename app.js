@@ -292,9 +292,9 @@ function parseCustomAgeGroups(input, country) {
   if (!tokens.length) throw new Error("Enter custom age groups, for example: 16-24, 25-34, 35-44.");
 
   const ranges = tokens.map(token => {
-    const rangeMatch = token.match(/^(\d{1,2})\s*-\s*(\d{1,2})$/);
-    const plusMatch = token.match(/^(\d{1,2})\+$/);
-    const singleMatch = token.match(/^(\d{1,2})$/);
+    const rangeMatch = token.match(/^(\d{1,3})\s*-\s*(\d{1,3})$/);
+    const plusMatch = token.match(/^(\d{1,3})\+$/);
+    const singleMatch = token.match(/^(\d{1,3})$/);
     if (rangeMatch) return { from: Number(rangeMatch[1]), to: Number(rangeMatch[2]) };
     if (plusMatch) return { from: Number(plusMatch[1]), to: 99 };
     if (singleMatch) return { from: Number(singleMatch[1]), to: Number(singleMatch[1]) };
@@ -306,8 +306,11 @@ function parseCustomAgeGroups(input, country) {
   const maxAge = ranges[ranges.length - 1].to;
   for (const range of ranges) {
     if (range.from > range.to) throw new Error(`Custom age group ${range.from}-${range.to} has the start after the end.`);
-    if (range.from < 0 || range.to > 99) {
-      throw new Error("Custom age groups must stay within ages 0-99.");
+    if (range.to > 99) {
+      throw new Error("Custom age groups are only available up to age 99.");
+    }
+    if (range.from < 0) {
+      throw new Error("Custom age groups must start at age 0 or higher.");
     }
     if (range.from !== expectedFrom) {
       throw new Error("Custom age groups must cover every age in the custom range without gaps or overlaps.");
