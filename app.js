@@ -152,6 +152,18 @@ function educationRows(basicPopulation, secondaryPopulation, higherPopulation, o
   return rows;
 }
 
+function isOtherUnknownEducationRow(row) {
+  return /\b(other|unknown|not stated|not specified)\b/i.test(row.label || "");
+}
+
+function educationRowsForCalculation(rows) {
+  return rows.filter(row => !isOtherUnknownEducationRow(row) && row.population > 0);
+}
+
+function educationSourceNoteWithExclusion(sourceNote) {
+  return `${sourceNote} Other and unknown education categories are excluded from calculation.`;
+}
+
 async function pxWebPostSelection(baseUrl, tableId, query) {
   const response = await fetch(`${baseUrl}/${tableId}`, {
     method: "POST",
@@ -1146,14 +1158,16 @@ async function buildQuotas() {
     if (educationLevel <= 0) {
       els.educationSection.hidden = true;
     } else if (education?.rows?.length) {
+      const visibleEducationRows = educationRowsForCalculation(education.rows);
+      if (!visibleEducationRows.length) throw new Error("No education rows found after excluding other and unknown categories.");
       const educationRowsForTable = buildQuotaRows(
-        education.rows.map(row => row.label),
-        education.rows.map(row => row.population),
+        visibleEducationRows.map(row => row.label),
+        visibleEducationRows.map(row => row.population),
         sampleSize
       );
-      const educationTotal = education.rows.reduce((sum, row) => sum + row.population, 0);
+      const educationTotal = visibleEducationRows.reduce((sum, row) => sum + row.population, 0);
       renderTable(els.educationTable, ["Education", "Population", "%", "Quota"], educationRowsForTable, ["Total", fmt(educationTotal), totalPercentString(), sampleSize]);
-      const educationNote = sourceNote(country, year, education.sourceNote);
+      const educationNote = sourceNote(country, year, educationSourceNoteWithExclusion(education.sourceNote));
       setMeta(els.educationMeta, educationNote, minAge, maxAge);
       addExportRows("Education Distribution", ["Education", "Population", "%", "Quota"], educationRowsForTable, ["Total", fmt(educationTotal), totalPercentString(), sampleSize], educationNote);
       els.educationSection.hidden = false;
