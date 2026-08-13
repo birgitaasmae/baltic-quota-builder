@@ -245,6 +245,16 @@ function getAgeBands(minAge, maxAge, grouping) {
   return bands;
 }
 
+function getLithuaniaAgeBands(minAge, maxAge, grouping) {
+  const exactMaxAge = Math.min(maxAge, 84);
+  const exactBands = minAge <= exactMaxAge ? getAgeBands(minAge, exactMaxAge, grouping) : [];
+  if (maxAge < 85) return exactBands;
+  return [
+    ...exactBands,
+    { code: "Y_GE85", from: 85, to: 99, label: "85+", key: "85+" }
+  ];
+}
+
 function getLatviaSettlementAgeGroups(minAge, maxAge) {
   const groups = [
     { code: "Y0-4", from: 0, to: 4 },
@@ -675,7 +685,7 @@ async function fetchLatviaEducation(year, minAge, maxAge, sexes) {
   };
 }
 
-async function fetchLithuaniaPopulation(year, minAge, maxAge) {
+async function fetchLithuaniaPopulation(year, minAge, maxAge, grouping) {
   const response = await fetch(`${LITHUANIA_PROXY_URL}?year=${encodeURIComponent(year)}`);
   if (!response.ok) {
     const body = await response.json().catch(() => null);
@@ -687,14 +697,12 @@ async function fetchLithuaniaPopulation(year, minAge, maxAge) {
   const labels = {};
 
   for (const row of data.rows) {
-    const perAge = row.population / (row.ageTo - row.ageFrom + 1);
-    for (let age = row.ageFrom; age <= row.ageTo; age++) {
-      if (row.regionCode === "00") {
-        national.set(`${row.sex}|${age}`, (national.get(`${row.sex}|${age}`) || 0) + perAge);
-      } else if (row.regionCode) {
-        regional.set(`${row.sex}|${age}|${row.regionCode}`, (regional.get(`${row.sex}|${age}|${row.regionCode}`) || 0) + perAge);
-        labels[row.regionCode] = row.regionLabel || row.regionCode;
-      }
+    const ageKey = row.ageFrom === 85 && row.ageTo === 99 ? "85+" : String(row.ageFrom);
+    if (row.regionCode === "00") {
+      national.set(`${row.sex}|${ageKey}`, (national.get(`${row.sex}|${ageKey}`) || 0) + row.population);
+    } else if (row.regionCode) {
+      regional.set(`${row.sex}|${ageKey}|${row.regionCode}`, (regional.get(`${row.sex}|${ageKey}|${row.regionCode}`) || 0) + row.population);
+      labels[row.regionCode] = row.regionLabel || row.regionCode;
     }
   }
 
@@ -704,6 +712,7 @@ async function fetchLithuaniaPopulation(year, minAge, maxAge) {
     labels,
     regionOrder: LITHUANIA_REGION_CODES,
     nationalRegionCode: "00",
+    ageBands: getLithuaniaAgeBands(minAge, maxAge, grouping),
     sourceNote: `${data.populationSourceNote || `State Data Agency of Lithuania / Official Statistics Portal: ${LITHUANIA_POPULATION_SOURCE_TITLE}, SDMX flow S3R167_M3010202.`}${maxAge >= 85 ? " Official age groups covering ages 85+." : ""}`
   };
 }
@@ -755,10 +764,10 @@ async function fetchLithuaniaSettlement(year, minAge, maxAge) {
   };
 }
 
-async function fetchPopulation(country, year, minAge, maxAge) {
+async function fetchPopulation(country, year, minAge, maxAge, grouping) {
   if (country === "EE") return fetchEstoniaPopulation(year, minAge, maxAge);
   if (country === "LV") return fetchLatviaPopulation(year, minAge, maxAge);
-  return fetchLithuaniaPopulation(year, minAge, maxAge);
+  return fetchLithuaniaPopulation(year, minAge, maxAge, grouping);
 }
 
 async function fetchNationality(country, year, minAge, maxAge, sexes) {
@@ -785,8 +794,12 @@ function aggregateNational(map, sexes, bands) {
     for (const band of bands) {
       const members = band.members || [band];
       for (const member of members) {
-        for (let age = member.from; age <= member.to; age++) {
-          total += map.get(`${sex}|${age}`) || 0;
+        if (member.key) {
+          total += map.get(`${sex}|${member.key}`) || 0;
+        } else {
+          for (let age = member.from; age <= member.to; age++) {
+            total += map.get(`${sex}|${age}`) || 0;
+          }
         }
       }
     }
@@ -800,8 +813,12 @@ function aggregateRegional(map, sexes, bands, geo = null) {
     for (const band of bands) {
       const members = band.members || [band];
       for (const member of members) {
-        for (let age = member.from; age <= member.to; age++) {
-          total += map.get(`${sex}|${age}|${geo}`) || 0;
+        if (member.key) {
+          total += map.get(`${sex}|${member.key}|${geo}`) || 0;
+        } else {
+          for (let age = member.from; age <= member.to; age++) {
+            total += map.get(`${sex}|${age}|${geo}`) || 0;
+          }
         }
       }
     }
@@ -903,8 +920,9 @@ async function buildQuotas() {
   state.rowsForExport = [];
 
   try {
-    const ageBands = getAgeBands(minAge, maxAge, grouping);
-    const population = await fetchPopulation(country, year, minAge, maxAge);
+    let ageBands = getAgeBands(minAge, maxAge, grouping);
+    const population = await fetchPopulation(country, year, minAge, maxAge, grouping);
+    ageBands = population.ageBands || ageBands;
     const [nationalityResult, educationResult, settlementResult] = await Promise.allSettled([
       fetchNationality(country, year, minAge, maxAge, sexes),
       educationLevel > 0 ? fetchEducation(country, year, minAge, maxAge, sexes) : Promise.resolve(null),
