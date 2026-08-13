@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Baltic Quota Builder</title>
-    <link rel="stylesheet" href="styles.css?v=norstat-type-teal-1">
+    <link rel="stylesheet" href="styles.css?v=feature-toggle-buttons-1">
   </head>
   <body>
     <main class="app-shell">
@@ -77,29 +77,20 @@
             </select>
           </label>
 
-          <label class="field">
+          <div class="field">
             <span>Regional Level</span>
-            <select id="regionLevelSelect">
-              <option value="3" selected>Show regional level</option>
-              <option value="0">Hide regional level</option>
-            </select>
-          </label>
+            <button id="regionLevelButton" class="feature-toggle" type="button" aria-pressed="true">Regional level</button>
+          </div>
 
-          <label class="field">
+          <div class="field">
             <span>Settlement Type</span>
-            <select id="settlementLevelSelect">
-              <option value="1" selected>Show settlement type</option>
-              <option value="0">Hide settlement type</option>
-            </select>
-          </label>
+            <button id="settlementLevelButton" class="feature-toggle" type="button" aria-pressed="true">Settlement type</button>
+          </div>
 
-          <label class="field">
+          <div class="field">
             <span>Education</span>
-            <select id="educationLevelSelect">
-              <option value="1" selected>Show education</option>
-              <option value="0">Hide education</option>
-            </select>
-          </label>
+            <button id="educationLevelButton" class="feature-toggle" type="button" aria-pressed="true">Education</button>
+          </div>
         </div>
 
         <div class="custom-age-panel">
@@ -197,6 +188,6 @@
       </section>
     </main>
 
-    <script type="module" src="app.js?v=education-exclude-other-unknown-1"></script>
+    <script type="module" src="app.js?v=feature-toggle-buttons-1"></script>
   </body>
 </html>

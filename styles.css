@@ -202,6 +202,27 @@ button.secondary:hover {
   background: var(--surface);
 }
 
+button.feature-toggle {
+  width: 100%;
+  border-color: var(--border-strong);
+  background: #ffffff;
+}
+
+button.feature-toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+button.feature-toggle[aria-pressed="true"]:hover {
+  border-color: var(--accent-dark);
+  background: var(--accent-dark);
+}
+
+button.feature-toggle[aria-pressed="false"]:hover {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+
 .status-text {
   color: var(--muted);
   font-size: 14px;

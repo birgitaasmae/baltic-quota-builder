@@ -96,9 +96,9 @@ const els = {
   customAgeGroupsField: document.querySelector("#customAgeGroupsField"),
   customAgeGroups: document.querySelector("#customAgeGroupsInput"),
   sexFilter: document.querySelector("#sexFilterSelect"),
-  regionLevel: document.querySelector("#regionLevelSelect"),
-  settlementLevel: document.querySelector("#settlementLevelSelect"),
-  educationLevel: document.querySelector("#educationLevelSelect"),
+  regionLevel: document.querySelector("#regionLevelButton"),
+  settlementLevel: document.querySelector("#settlementLevelButton"),
+  educationLevel: document.querySelector("#educationLevelButton"),
   build: document.querySelector("#buildButton"),
   status: document.querySelector("#statusText"),
   summary: document.querySelector("#summaryPanel"),
@@ -1007,6 +1007,16 @@ function setBusy(isBusy) {
   els.status.textContent = isBusy ? "Fetching population data..." : "Ready.";
 }
 
+function selectedFeatureLevel(button) {
+  return button.getAttribute("aria-pressed") === "true" ? 1 : 0;
+}
+
+function toggleFeatureButton(event) {
+  const button = event.currentTarget;
+  const isPressed = button.getAttribute("aria-pressed") === "true";
+  button.setAttribute("aria-pressed", String(!isPressed));
+}
+
 function updateCustomAgeGroupsVisibility() {
   const isCustom = els.customAgeGroupsToggle.checked;
   els.customAgeGroupsField.hidden = !isCustom;
@@ -1022,9 +1032,9 @@ async function buildQuotas() {
   let maxAge = Number(els.maxAge.value);
   const groupingValue = els.customAgeGroupsToggle.checked ? "custom" : els.grouping.value;
   const grouping = groupingValue === "custom" ? null : Number(groupingValue);
-  const regionLevel = Number(els.regionLevel.value);
-  const settlementLevel = Number(els.settlementLevel.value);
-  const educationLevel = Number(els.educationLevel.value);
+  const regionLevel = selectedFeatureLevel(els.regionLevel);
+  const settlementLevel = selectedFeatureLevel(els.settlementLevel);
+  const educationLevel = selectedFeatureLevel(els.educationLevel);
   const sexes = els.sexFilter.value === "MF" ? ["M", "F"] : [els.sexFilter.value];
 
   if (sampleSize < 10) {
@@ -1411,6 +1421,9 @@ function downloadExcel() {
 
 els.build.addEventListener("click", buildQuotas);
 els.customAgeGroupsToggle.addEventListener("change", updateCustomAgeGroupsVisibility);
+els.regionLevel.addEventListener("click", toggleFeatureButton);
+els.settlementLevel.addEventListener("click", toggleFeatureButton);
+els.educationLevel.addEventListener("click", toggleFeatureButton);
 els.copy.addEventListener("click", copyTsv);
 els.download.addEventListener("click", downloadCsv);
 els.excel.addEventListener("click", downloadExcel);
