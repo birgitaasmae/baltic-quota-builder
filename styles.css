@@ -97,6 +97,31 @@ h2 {
   grid-column: span 2;
 }
 
+.toggle-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  color: var(--text);
+}
+
+.toggle-field input {
+  width: auto;
+  margin-top: 2px;
+}
+
+.toggle-field strong,
+.toggle-field small {
+  display: block;
+}
+
+.toggle-field small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-weight: 400;
+  line-height: 1.35;
+}
+
 input,
 select,
 textarea {

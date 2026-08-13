@@ -92,6 +92,7 @@ const els = {
   minAge: document.querySelector("#minAgeInput"),
   maxAge: document.querySelector("#maxAgeInput"),
   grouping: document.querySelector("#ageGroupingSelect"),
+  customAgeGroupsToggle: document.querySelector("#customAgeGroupsToggle"),
   customAgeGroupsField: document.querySelector("#customAgeGroupsField"),
   customAgeGroups: document.querySelector("#customAgeGroupsInput"),
   sexFilter: document.querySelector("#sexFilterSelect"),
@@ -989,7 +990,7 @@ function setBusy(isBusy) {
 }
 
 function updateCustomAgeGroupsVisibility() {
-  els.customAgeGroupsField.hidden = els.grouping.value !== "custom";
+  els.customAgeGroupsField.hidden = !els.customAgeGroupsToggle.checked;
 }
 
 async function buildQuotas() {
@@ -998,7 +999,7 @@ async function buildQuotas() {
   const sampleSize = Number(els.sampleSize.value);
   const minAge = Number(els.minAge.value);
   const maxAge = Number(els.maxAge.value);
-  const groupingValue = els.grouping.value;
+  const groupingValue = els.customAgeGroupsToggle.checked ? "custom" : els.grouping.value;
   const grouping = groupingValue === "custom" ? null : Number(groupingValue);
   const regionLevel = Number(els.regionLevel.value);
   const settlementLevel = Number(els.settlementLevel.value);
@@ -1380,7 +1381,7 @@ function downloadExcel() {
 }
 
 els.build.addEventListener("click", buildQuotas);
-els.grouping.addEventListener("change", updateCustomAgeGroupsVisibility);
+els.customAgeGroupsToggle.addEventListener("change", updateCustomAgeGroupsVisibility);
 els.copy.addEventListener("click", copyTsv);
 els.download.addEventListener("click", downloadCsv);
 els.excel.addEventListener("click", downloadExcel);
