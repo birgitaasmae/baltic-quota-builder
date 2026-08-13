@@ -251,7 +251,7 @@ function getLithuaniaAgeBands(minAge, maxAge, grouping) {
   if (maxAge < 85) return exactBands;
   return [
     ...exactBands,
-    { code: "Y_GE85", from: 85, to: 99, label: "85+", key: "85+" }
+    { code: "Y_GE85", from: 85, to: 99, label: "85+ (up to 99 years)", key: "85+" }
   ];
 }
 
@@ -328,7 +328,7 @@ function describeAgeGroupCoverage(groups) {
   if (!groups.length) return "no age groups";
   const from = groups[0].from;
   const to = groups[groups.length - 1].to;
-  return `${from}-${to === 99 ? "85+" : to}`;
+  return `${from}-${to === 99 ? "85+ (up to 99 years)" : to}`;
 }
 
 function fmt(number) {
@@ -713,7 +713,7 @@ async function fetchLithuaniaPopulation(year, minAge, maxAge, grouping) {
     regionOrder: LITHUANIA_REGION_CODES,
     nationalRegionCode: "00",
     ageBands: getLithuaniaAgeBands(minAge, maxAge, grouping),
-    sourceNote: `${data.populationSourceNote || `State Data Agency of Lithuania / Official Statistics Portal: ${LITHUANIA_POPULATION_SOURCE_TITLE}, SDMX flow S3R167_M3010202.`}${maxAge >= 85 ? " Official age groups covering ages 85+." : ""}`
+    sourceNote: `${data.populationSourceNote || `State Data Agency of Lithuania / Official Statistics Portal: ${LITHUANIA_POPULATION_SOURCE_TITLE}, SDMX flow S3R167_M3010202.`}${maxAge >= 85 ? " Official age groups covering ages 85+ (up to 99 years)." : ""}`
   };
 }
 
