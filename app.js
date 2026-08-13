@@ -23,7 +23,7 @@ const LITHUANIA_NATIONALITY_SOURCE_TITLE = "Resident population by ethnicity at 
 const LITHUANIA_EDUCATION_SOURCE_TITLE = "Population aged 15 and older by educational attainment";
 const LITHUANIA_SETTLEMENT_URBAN_RURAL_SOURCE_TITLE = "Resident population by urban and rural residence at the beginning of the year";
 const LITHUANIA_SETTLEMENT_CITY_SOURCE_TITLE = "Resident population in cities and towns at the beginning of the year";
-const PERCENT_DECIMALS = 4;
+const PERCENT_DECIMALS = 1;
 
 const ESTONIA_REGION_CODES = [
   "784", "37_NO_TALLINN", "39", "44", "49", "51", "57", "59", "65", "67", "70", "74", "78", "82", "84", "86"
