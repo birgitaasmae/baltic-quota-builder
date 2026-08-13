@@ -102,7 +102,6 @@ const els = {
   status: document.querySelector("#statusText"),
   summary: document.querySelector("#summaryPanel"),
   populationBase: document.querySelector("#populationBase"),
-  selectedAges: document.querySelector("#selectedAges"),
   selectedSample: document.querySelector("#selectedSample"),
   estimatedMargin: document.querySelector("#estimatedMargin"),
   results: document.querySelector("#results"),
@@ -1046,7 +1045,6 @@ async function buildQuotas() {
 
     els.summary.hidden = false;
     els.populationBase.textContent = fmt(totalPopulation);
-    els.selectedAges.textContent = `${minAge}-${maxAge} (maximum age ${maxAge})`;
     els.selectedSample.textContent = fmt(sampleSize);
     els.estimatedMargin.textContent = `${(marginOfError(sampleSize, totalPopulation) * 100).toFixed(1)}%`;
 
