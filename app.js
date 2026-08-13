@@ -283,7 +283,7 @@ function bandFromLithuaniaRange(from, to) {
   };
 }
 
-function parseCustomAgeGroups(input, minAge, maxAge, country) {
+function parseCustomAgeGroups(input, country) {
   const tokens = input
     .split(/[\n,;]+/)
     .map(value => value.trim())
@@ -296,30 +296,33 @@ function parseCustomAgeGroups(input, minAge, maxAge, country) {
     const plusMatch = token.match(/^(\d{1,2})\+$/);
     const singleMatch = token.match(/^(\d{1,2})$/);
     if (rangeMatch) return { from: Number(rangeMatch[1]), to: Number(rangeMatch[2]) };
-    if (plusMatch) return { from: Number(plusMatch[1]), to: maxAge };
+    if (plusMatch) return { from: Number(plusMatch[1]), to: 99 };
     if (singleMatch) return { from: Number(singleMatch[1]), to: Number(singleMatch[1]) };
     throw new Error(`Could not read custom age group "${token}". Use ranges like 16-24.`);
   });
 
-  let expectedFrom = minAge;
+  let expectedFrom = ranges[0].from;
+  const minAge = ranges[0].from;
+  const maxAge = ranges[ranges.length - 1].to;
   for (const range of ranges) {
     if (range.from > range.to) throw new Error(`Custom age group ${range.from}-${range.to} has the start after the end.`);
-    if (range.from < minAge || range.to > maxAge) {
-      throw new Error(`Custom age groups must stay within selected ages ${minAge}-${maxAge}.`);
+    if (range.from < 0 || range.to > 99) {
+      throw new Error("Custom age groups must stay within ages 0-99.");
     }
     if (range.from !== expectedFrom) {
-      throw new Error(`Custom age groups must cover every age from ${minAge} to ${maxAge} without gaps or overlaps.`);
+      throw new Error("Custom age groups must cover every age in the custom range without gaps or overlaps.");
     }
     expectedFrom = range.to + 1;
   }
-  if (expectedFrom !== maxAge + 1) {
-    throw new Error(`Custom age groups must end at the selected maximum age ${maxAge}.`);
-  }
 
-  return ranges.map(range => country === "LT"
-    ? bandFromLithuaniaRange(range.from, range.to)
-    : bandFromRange(range.from, range.to)
-  );
+  return {
+    minAge,
+    maxAge,
+    bands: ranges.map(range => country === "LT"
+      ? bandFromLithuaniaRange(range.from, range.to)
+      : bandFromRange(range.from, range.to)
+    )
+  };
 }
 
 function getLithuaniaAgeBands(minAge, maxAge, grouping) {
@@ -990,15 +993,18 @@ function setBusy(isBusy) {
 }
 
 function updateCustomAgeGroupsVisibility() {
-  els.customAgeGroupsField.hidden = !els.customAgeGroupsToggle.checked;
+  const isCustom = els.customAgeGroupsToggle.checked;
+  els.customAgeGroupsField.hidden = !isCustom;
+  els.minAge.disabled = isCustom;
+  els.maxAge.disabled = isCustom;
 }
 
 async function buildQuotas() {
   const country = els.country.value;
   const year = els.year.value;
   const sampleSize = Number(els.sampleSize.value);
-  const minAge = Number(els.minAge.value);
-  const maxAge = Number(els.maxAge.value);
+  let minAge = Number(els.minAge.value);
+  let maxAge = Number(els.maxAge.value);
   const groupingValue = els.customAgeGroupsToggle.checked ? "custom" : els.grouping.value;
   const grouping = groupingValue === "custom" ? null : Number(groupingValue);
   const regionLevel = Number(els.regionLevel.value);
@@ -1006,14 +1012,6 @@ async function buildQuotas() {
   const educationLevel = Number(els.educationLevel.value);
   const sexes = els.sexFilter.value === "MF" ? ["M", "F"] : [els.sexFilter.value];
 
-  if (minAge > maxAge) {
-    els.status.textContent = "Maximum age must be at least minimum age.";
-    return;
-  }
-  if (maxAge > 99) {
-    els.status.textContent = "Maximum age must be 99 or lower.";
-    return;
-  }
   if (sampleSize < 10) {
     els.status.textContent = "Sample size must be at least 10.";
     return;
@@ -1023,9 +1021,23 @@ async function buildQuotas() {
   state.rowsForExport = [];
 
   try {
-    const customAgeBands = groupingValue === "custom"
-      ? parseCustomAgeGroups(els.customAgeGroups.value, minAge, maxAge, country)
+    const customAgeSelection = groupingValue === "custom"
+      ? parseCustomAgeGroups(els.customAgeGroups.value, country)
       : null;
+    if (customAgeSelection) {
+      minAge = customAgeSelection.minAge;
+      maxAge = customAgeSelection.maxAge;
+    } else {
+      if (minAge > maxAge) {
+        els.status.textContent = "Maximum age must be at least minimum age.";
+        return;
+      }
+      if (maxAge > 99) {
+        els.status.textContent = "Maximum age must be 99 or lower.";
+        return;
+      }
+    }
+    const customAgeBands = customAgeSelection?.bands || null;
     let ageBands = customAgeBands || getAgeBands(minAge, maxAge, grouping);
     const population = await fetchPopulation(country, year, minAge, maxAge, grouping || 5);
     ageBands = customAgeBands || population.ageBands || ageBands;
