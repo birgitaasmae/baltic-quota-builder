@@ -1,14 +1,15 @@
 :root {
   color-scheme: light;
-  --bg: #f4f1e8;
-  --panel: #fffdf7;
-  --text: #161616;
-  --muted: #5a5a52;
-  --line: #d9d4c6;
-  --accent: #d9ff43;
-  --accent-dark: #bce500;
-  --soft: #eef5d2;
-  --surface: #ebe6d8;
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --text: #050505;
+  --muted: #5f5f5f;
+  --line: #d7d7d7;
+  --accent: #10c8a0;
+  --accent-dark: #0caf8e;
+  --soft: #e9faf6;
+  --surface: #f7f7f7;
+  --border-strong: #111111;
 }
 
 * {
@@ -20,7 +21,7 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: Inter, Aptos, "Segoe UI", Arial, Helvetica, sans-serif;
+  font-family: Inter, "Helvetica Neue", "Segoe UI", Arial, Helvetica, sans-serif;
 }
 
 .app-shell {
@@ -63,12 +64,12 @@ p {
 
 h1 {
   font-size: 34px;
-  font-weight: 760;
+  font-weight: 800;
 }
 
 h2 {
   font-size: 20px;
-  font-weight: 720;
+  font-weight: 700;
 }
 
 .panel,
@@ -121,7 +122,7 @@ h2 {
 .toggle-field input {
   width: auto;
   margin-top: 2px;
-  accent-color: var(--text);
+  accent-color: var(--accent);
 }
 
 .toggle-field strong,
@@ -144,7 +145,7 @@ textarea {
   border-radius: 4px;
   padding: 10px 12px;
   color: var(--text);
-  background: #fffdf7;
+  background: #ffffff;
   font: inherit;
 }
 
@@ -163,7 +164,7 @@ textarea {
 }
 
 button {
-  border: 0;
+  border: 1px solid var(--accent);
   border-radius: 4px;
   padding: 11px 16px;
   color: var(--text);
@@ -173,6 +174,7 @@ button {
 }
 
 button:hover {
+  border-color: var(--accent-dark);
   background: var(--accent-dark);
 }
 
@@ -183,6 +185,12 @@ button:disabled {
 
 button.secondary {
   color: var(--text);
+  background: #ffffff;
+  border-color: var(--border-strong);
+}
+
+button.secondary:hover {
+  border-color: var(--border-strong);
   background: var(--surface);
 }
 
