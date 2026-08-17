@@ -1451,6 +1451,7 @@ function downloadExcel() {
 }
 
 els.build.addEventListener("click", buildQuotas);
+els.grouping.addEventListener("change", buildQuotas);
 els.customAgeGroupsToggle.addEventListener("change", updateCustomAgeGroupsVisibility);
 els.regionLevel.addEventListener("click", toggleFeatureButton);
 els.settlementLevel.addEventListener("click", toggleFeatureButton);
