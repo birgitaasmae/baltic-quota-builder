@@ -82,7 +82,8 @@ const state = {
   latestPopulationData: null,
   latestRegionalData: null,
   latestGeoLabels: {},
-  latviaSettlementCodes: null
+  latviaSettlementCodes: null,
+  previousAgeGrouping: "5"
 };
 
 const els = {
@@ -1097,6 +1098,12 @@ function updateCustomAgeGroupsVisibility() {
   els.customAgeGroupsField.hidden = !isCustom;
   els.minAge.disabled = isCustom;
   els.maxAge.disabled = isCustom;
+  if (isCustom && els.grouping.value !== "custom") {
+    state.previousAgeGrouping = els.grouping.value;
+    els.grouping.value = "custom";
+  } else if (!isCustom && els.grouping.value === "custom") {
+    els.grouping.value = state.previousAgeGrouping || "5";
+  }
   els.grouping.disabled = isCustom;
 }
 
