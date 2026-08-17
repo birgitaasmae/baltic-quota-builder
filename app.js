@@ -24,8 +24,6 @@ const LITHUANIA_EDUCATION_SOURCE_TITLE = "Population aged 15 and older by educat
 const LITHUANIA_SETTLEMENT_URBAN_RURAL_SOURCE_TITLE = "Resident population by urban and rural residence at the beginning of the year";
 const LITHUANIA_SETTLEMENT_CITY_SOURCE_TITLE = "Resident population in cities and towns at the beginning of the year";
 const PERCENT_DECIMALS = 1;
-const OPEN_ENDED_AGE = 100;
-const OPEN_ENDED_AGE_KEY = "100+";
 
 const ESTONIA_REGION_CODES = [
   "784", "37_NO_TALLINN", "39", "44", "49", "51", "57", "59", "65", "67", "70", "74", "78", "82", "84", "86"
@@ -132,15 +130,20 @@ const els = {
   excel: document.querySelector("#excelButton")
 };
 
-function ethnicityRows(nativeLabel, russianLabel, otherLabel, nativePopulation, russianPopulation, totalPopulation) {
+function ethnicityRows(nativeLabel, russianLabel, otherLabel, nativePopulation, russianPopulation, totalPopulation, unknownPopulation = 0) {
   const native = Number(nativePopulation) || 0;
   const russian = Number(russianPopulation) || 0;
   const total = Number(totalPopulation) || native + russian;
+  const unknown = Number(unknownPopulation) || 0;
   return [
     { label: nativeLabel, population: native },
     { label: russianLabel, population: russian },
-    { label: otherLabel, population: Math.max(0, total - native - russian) }
-  ];
+    { label: otherLabel, population: Math.max(0, total - native - russian - unknown) }
+  ].filter(row => row.population > 0);
+}
+
+function nationalitySourceNoteWithExclusion(sourceNote, extra = "") {
+  return `${sourceNote} Unknown or not indicated nationality is excluded from calculation.${extra ? ` ${extra}` : ""}`;
 }
 
 function educationRows(basicPopulation, secondaryPopulation, higherPopulation, otherPopulation = 0) {
@@ -227,30 +230,10 @@ function exactAgeCode(age) {
   return `Y${age}`;
 }
 
-function isOpenEndedAge(age) {
-  return age >= OPEN_ENDED_AGE;
-}
-
-function exactAgeLabel(age) {
-  return isOpenEndedAge(age) ? OPEN_ENDED_AGE_KEY : String(age);
-}
-
-function exactAgeMember(age) {
-  return isOpenEndedAge(age)
-    ? { code: "Y_GE100", from: OPEN_ENDED_AGE, to: OPEN_ENDED_AGE, label: OPEN_ENDED_AGE_KEY, key: OPEN_ENDED_AGE_KEY }
-    : { code: exactAgeCode(age), from: age, to: age, label: String(age) };
-}
-
-function ageBandLabel(start, end, members) {
-  if (start === end) return exactAgeLabel(start);
-  if (members?.some(member => member.key === OPEN_ENDED_AGE_KEY)) return `${start}-99 and ${OPEN_ENDED_AGE_KEY}`;
-  return `${start}-${end}`;
-}
-
 function getAgeBands(minAge, maxAge, grouping) {
   const ages = [];
   for (let age = minAge; age <= maxAge; age++) {
-    ages.push(exactAgeMember(age));
+    ages.push({ code: exactAgeCode(age), from: age, to: age, label: String(age) });
   }
   if (grouping === 1) return ages;
 
@@ -263,7 +246,7 @@ function getAgeBands(minAge, maxAge, grouping) {
       code: `Y${start}-${end}`,
       from: start,
       to: end,
-      label: ageBandLabel(start, end, members),
+      label: start === end ? String(start) : `${start}-${end}`,
       members
     });
     start = 25;
@@ -276,7 +259,7 @@ function getAgeBands(minAge, maxAge, grouping) {
       code: `Y${start}-${end}`,
       from: start,
       to: end,
-      label: ageBandLabel(start, end, members),
+      label: start === end ? String(start) : `${start}-${end}`,
       members
     });
   }
@@ -286,19 +269,18 @@ function getAgeBands(minAge, maxAge, grouping) {
 function getExactAgeMembers(from, to) {
   const members = [];
   for (let age = from; age <= to; age++) {
-    members.push(exactAgeMember(age));
+    members.push({ code: exactAgeCode(age), from: age, to: age, label: String(age) });
   }
   return members;
 }
 
 function bandFromRange(from, to) {
-  const members = getExactAgeMembers(from, to);
   return {
     code: `Y${from}-${to}`,
     from,
     to,
-    label: ageBandLabel(from, to, members),
-    members
+    label: from === to ? String(from) : `${from}-${to}`,
+    members: getExactAgeMembers(from, to)
   };
 }
 
@@ -331,7 +313,7 @@ function parseCustomAgeGroups(input, country) {
     const plusMatch = token.match(/^(\d{1,3})\+$/);
     const singleMatch = token.match(/^(\d{1,3})$/);
     if (rangeMatch) return { from: Number(rangeMatch[1]), to: Number(rangeMatch[2]) };
-    if (plusMatch) return { from: Number(plusMatch[1]), to: OPEN_ENDED_AGE };
+    if (plusMatch) return { from: Number(plusMatch[1]), to: 99 };
     if (singleMatch) return { from: Number(singleMatch[1]), to: Number(singleMatch[1]) };
     throw new Error(`Could not read custom age group "${token}". Use ranges like 16-24.`);
   });
@@ -341,11 +323,8 @@ function parseCustomAgeGroups(input, country) {
   const maxAge = ranges[ranges.length - 1].to;
   for (const range of ranges) {
     if (range.from > range.to) throw new Error(`Custom age group ${range.from}-${range.to} has the start after the end.`);
-    if (country === "LT" && range.to > 99) {
-      throw new Error("Lithuania custom age groups are only available up to age 99.");
-    }
-    if (range.to > OPEN_ENDED_AGE) {
-      throw new Error("Custom age groups are only available up to 100+.");
+    if (range.to > 99) {
+      throw new Error("Custom age groups are only available up to age 99.");
     }
     if (range.from < 0) {
       throw new Error("Custom age groups must start at age 0 or higher.");
@@ -376,12 +355,6 @@ function getLithuaniaAgeBands(minAge, maxAge, grouping) {
   ];
 }
 
-function describeExactAgeCoverage(minAge, maxAge) {
-  return isOpenEndedAge(maxAge)
-    ? `${minAge}-99 and 100+ (no upper maximum published)`
-    : `${minAge}-${maxAge}`;
-}
-
 function getLatviaSettlementAgeGroups(minAge, maxAge) {
   const groups = [
     { code: "Y0-4", from: 0, to: 4 },
@@ -401,7 +374,7 @@ function getLatviaSettlementAgeGroups(minAge, maxAge) {
     { code: "Y70-74", from: 70, to: 74 },
     { code: "Y75-79", from: 75, to: 79 },
     { code: "Y80-84", from: 80, to: 84 },
-    { code: "Y_GE85", from: 85, to: OPEN_ENDED_AGE }
+    { code: "Y_GE85", from: 85, to: 99 }
   ];
   return groups.filter(group => group.to >= minAge && group.from <= maxAge);
 }
@@ -425,7 +398,7 @@ function getEstoniaNationalityAgeGroups(minAge, maxAge) {
     { code: "16", from: 70, to: 74 },
     { code: "17", from: 75, to: 79 },
     { code: "18", from: 80, to: 84 },
-    { code: "23", from: 85, to: OPEN_ENDED_AGE }
+    { code: "23", from: 85, to: 99 }
   ];
   return groups.filter(group => group.to >= minAge && group.from <= maxAge);
 }
@@ -446,7 +419,7 @@ function getEstoniaEducationAgeGroups(minAge, maxAge) {
     { code: "13", from: 70, to: 74 },
     { code: "14", from: 75, to: 79 },
     { code: "15", from: 80, to: 84 },
-    { code: "16", from: 85, to: OPEN_ENDED_AGE }
+    { code: "16", from: 85, to: 99 }
   ];
   return groups.filter(group => group.to >= minAge && group.from <= maxAge);
 }
@@ -454,8 +427,11 @@ function getEstoniaEducationAgeGroups(minAge, maxAge) {
 function describeAgeGroupCoverage(groups) {
   if (!groups.length) return "no age groups";
   const from = groups[0].from;
-  const to = groups[groups.length - 1].to;
-  return `${from}-${isOpenEndedAge(to) ? "85+ (no upper maximum published)" : to}`;
+  const last = groups[groups.length - 1];
+  if (last.from === 85 && last.to === 99) {
+    return from <= 84 ? `${from}-84 and 85+ (up to 99 years)` : "85+ (up to 99 years)";
+  }
+  return `${from}-${last.to}`;
 }
 
 function fmt(number) {
@@ -499,8 +475,7 @@ function largestRemainder(proportions, total) {
 
 async function fetchEstoniaPopulation(year, minAge, maxAge) {
   const ageCodes = [];
-  for (let age = minAge; age <= Math.min(maxAge, 99); age++) ageCodes.push(String(age));
-  if (isOpenEndedAge(maxAge)) ageCodes.push("102");
+  for (let age = minAge; age <= maxAge; age++) ageCodes.push(String(age));
   const areaCodes = ["00", ...ESTONIA_REGION_QUERY_CODES];
 
   const data = await pxWebPostSelection(ESTONIA_API_BASE, ESTONIA_TABLE_ID, [
@@ -518,7 +493,7 @@ async function fetchEstoniaPopulation(year, minAge, maxAge) {
 
   for (const area of areaCodes) {
     for (const sex of ["M", "F"]) {
-      for (let age = minAge; age <= Math.min(maxAge, 99); age++) {
+      for (let age = minAge; age <= maxAge; age++) {
         const value = lookupValue(parsed, {
           Sugu: sexCodeByKey[sex],
           Elukoht: area,
@@ -530,31 +505,12 @@ async function fetchEstoniaPopulation(year, minAge, maxAge) {
           else rawRegional.set(`${sex}|${age}|${area}`, value);
         }
       }
-      if (isOpenEndedAge(maxAge)) {
-        const value = lookupValue(parsed, {
-          Sugu: sexCodeByKey[sex],
-          Elukoht: area,
-          Aasta: year,
-          Vanus: "102"
-        });
-        if (value > 0) {
-          if (area === "00") national.set(`${sex}|${OPEN_ENDED_AGE_KEY}`, value);
-          else rawRegional.set(`${sex}|${OPEN_ENDED_AGE_KEY}|${area}`, value);
-        }
-      }
     }
   }
   for (const area of ESTONIA_REGION_CODES) {
     for (const sex of ["M", "F"]) {
-      for (let age = minAge; age <= Math.min(maxAge, 99); age++) {
+      for (let age = minAge; age <= maxAge; age++) {
         const key = `${sex}|${age}`;
-        const value = area === "37_NO_TALLINN"
-          ? Math.max(0, (rawRegional.get(`${key}|37`) || 0) - (rawRegional.get(`${key}|784`) || 0))
-          : rawRegional.get(`${key}|${area}`) || 0;
-        if (value > 0) regional.set(`${key}|${area}`, value);
-      }
-      if (isOpenEndedAge(maxAge)) {
-        const key = `${sex}|${OPEN_ENDED_AGE_KEY}`;
         const value = area === "37_NO_TALLINN"
           ? Math.max(0, (rawRegional.get(`${key}|37`) || 0) - (rawRegional.get(`${key}|784`) || 0))
           : rawRegional.get(`${key}|${area}`) || 0;
@@ -568,7 +524,7 @@ async function fetchEstoniaPopulation(year, minAge, maxAge) {
     labels,
     regionOrder: ESTONIA_REGION_CODES,
     nationalRegionCode: "00",
-    sourceNote: `Statistics Estonia table RV0240${isOpenEndedAge(maxAge) ? ". Includes official 100+ age group (no upper maximum published)." : ""}`
+    sourceNote: "Statistics Estonia table RV0240"
   };
 }
 
@@ -582,7 +538,7 @@ async function fetchEstoniaNationality(year, minAge, maxAge, sexes) {
     { code: ageGroupCode, selection: { filter: "item", values: ageGroups.map(group => group.code) } },
     { code: "Maakond", selection: { filter: "item", values: ["1"] } },
     { code: "Sugu", selection: { filter: "item", values: sexCodes } },
-    { code: "Rahvus", selection: { filter: "item", values: ["1", "2", "3"] } }
+    { code: "Rahvus", selection: { filter: "item", values: ["1", "2", "3", "6"] } }
   ]);
   const parsed = parseJsonStat(data);
   const valueFor = code => {
@@ -601,15 +557,14 @@ async function fetchEstoniaNationality(year, minAge, maxAge, sexes) {
     return total;
   };
   return {
-    rows: ethnicityRows("Estonian", "Russian", "Other", valueFor("2"), valueFor("3"), valueFor("1")),
-    sourceNote: `Statistics Estonia table RV022U. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`
+    rows: ethnicityRows("Estonian", "Russian", "Other", valueFor("2"), valueFor("3"), valueFor("1"), valueFor("6")),
+    sourceNote: nationalitySourceNoteWithExclusion(`Statistics Estonia table RV022U. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`)
   };
 }
 
 async function fetchEstoniaSettlement(year, minAge, maxAge, sexes) {
   const ageCodes = [];
-  for (let age = minAge; age <= Math.min(maxAge, 99); age++) ageCodes.push(String(age));
-  if (isOpenEndedAge(maxAge)) ageCodes.push("102");
+  for (let age = minAge; age <= maxAge; age++) ageCodes.push(String(age));
   const sexCodes = sexes.length === 2 ? ["1"] : sexes.map(sex => sex === "M" ? "2" : "3");
   const data = await pxWebPostSelection(ESTONIA_API_BASE, ESTONIA_TABLE_ID, [
     { code: "Sugu", selection: { filter: "item", values: sexCodes } },
@@ -640,7 +595,7 @@ async function fetchEstoniaSettlement(year, minAge, maxAge, sexes) {
       { label: "Other cities", population: Math.max(0, valueFor("H2") + valueFor("H3") - valueFor("784") - sumCodes(ESTONIA_BIG_CITY_CODES)) },
       { label: "Rural area", population: valueFor("H4") }
     ],
-    sourceNote: `Statistics Estonia table RV0240. Exact ages ${describeExactAgeCoverage(minAge, maxAge)}; same settlement formula as the Estonian quota builder: capital, big cities, other cities, rural.`
+    sourceNote: `Statistics Estonia table RV0240. Exact ages ${minAge}-${maxAge}; same settlement formula as the Estonian quota builder: capital, big cities, other cities, rural.`
   };
 }
 
@@ -680,8 +635,7 @@ async function fetchEstoniaEducation(year, minAge, maxAge, sexes) {
 
 async function fetchLatviaPopulation(year, minAge, maxAge) {
   const ageCodes = [];
-  for (let age = minAge; age <= Math.min(maxAge, 99); age++) ageCodes.push(exactAgeCode(age));
-  if (isOpenEndedAge(maxAge)) ageCodes.push("Y_GE100");
+  for (let age = minAge; age <= maxAge; age++) ageCodes.push(exactAgeCode(age));
   const areaCodes = ["LV", ...LATVIA_REGION_CODES];
 
   const data = await latviaPostSelection(LATVIA_TABLE_ID, [
@@ -698,7 +652,7 @@ async function fetchLatviaPopulation(year, minAge, maxAge) {
 
   for (const area of areaCodes) {
     for (const sex of ["M", "F"]) {
-      for (let age = minAge; age <= Math.min(maxAge, 99); age++) {
+      for (let age = minAge; age <= maxAge; age++) {
         const value = lookupValue(parsed, {
           AREA: area,
           AGE: exactAgeCode(age),
@@ -711,19 +665,6 @@ async function fetchLatviaPopulation(year, minAge, maxAge) {
           else regional.set(`${sex}|${age}|${area}`, value);
         }
       }
-      if (isOpenEndedAge(maxAge)) {
-        const value = lookupValue(parsed, {
-          AREA: area,
-          AGE: "Y_GE100",
-          SEX: sex,
-          ContentsCode: LATVIA_TABLE_ID,
-          TIME: year
-        });
-        if (value > 0) {
-          if (area === "LV") national.set(`${sex}|${OPEN_ENDED_AGE_KEY}`, value);
-          else regional.set(`${sex}|${OPEN_ENDED_AGE_KEY}|${area}`, value);
-        }
-      }
     }
   }
   return {
@@ -732,7 +673,7 @@ async function fetchLatviaPopulation(year, minAge, maxAge) {
     labels,
     regionOrder: LATVIA_REGION_CODES,
     nationalRegionCode: "LV",
-    sourceNote: `Central Statistics Bureau of Latvia table IRD041${isOpenEndedAge(maxAge) ? ". Includes official 100+ age group (no upper maximum published)." : ""}`
+    sourceNote: "Central Statistics Bureau of Latvia table IRD041"
   };
 }
 
@@ -740,7 +681,7 @@ async function fetchLatviaNationality(year, minAge, maxAge) {
   const ageGroups = getLatviaSettlementAgeGroups(minAge, maxAge);
   if (!ageGroups.length) throw new Error("No Latvia nationality age groups found for this selection.");
   const data = await latviaPostSelection(LATVIA_NATIONALITY_AGE_TABLE_ID, [
-    { variableCode: "ETHNICITY", valueCodes: ["TOTAL", "E_LAT", "E_RUS"] },
+    { variableCode: "ETHNICITY", valueCodes: ["TOTAL", "E_LAT", "E_RUS", "OTH_NSP_UNK"] },
     { variableCode: "AgeGroup", valueCodes: ageGroups.map(group => group.code) },
     { variableCode: "ContentsCode", valueCodes: [LATVIA_NATIONALITY_AGE_TABLE_ID] },
     { variableCode: "TIME", valueCodes: [year] }
@@ -753,8 +694,11 @@ async function fetchLatviaNationality(year, minAge, maxAge) {
     TIME: year
   }) || 0), 0);
   return {
-    rows: ethnicityRows("Latvian", "Russian", "Other", valueFor("E_LAT"), valueFor("E_RUS"), valueFor("TOTAL")),
-    sourceNote: `Central Statistics Bureau of Latvia table IRE040. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`
+    rows: ethnicityRows("Latvian", "Russian", "Other", valueFor("E_LAT"), valueFor("E_RUS"), valueFor("TOTAL"), valueFor("OTH_NSP_UNK")),
+    sourceNote: nationalitySourceNoteWithExclusion(
+      `Central Statistics Bureau of Latvia table IRE040. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`,
+      "Latvia CSB combines other ethnicities with not selected/not indicated ethnicity in this table, so that combined category is excluded."
+    )
   };
 }
 
@@ -900,7 +844,7 @@ async function fetchLithuaniaNationality(year) {
   if (!data.nationalityRows?.length) throw new Error("No Lithuania nationality rows found for this year.");
   return {
     rows: data.nationalityRows,
-    sourceNote: data.nationalitySourceNote || `State Data Agency of Lithuania / Official Statistics Portal: ${LITHUANIA_NATIONALITY_SOURCE_TITLE}, SDMX flow S3R167_M3010215_1. Whole-country ethnicity distribution.`
+    sourceNote: data.nationalitySourceNote || `State Data Agency of Lithuania / Official Statistics Portal: ${LITHUANIA_NATIONALITY_SOURCE_TITLE}, SDMX flow S3R167_M3010215_1. Whole-country ethnicity distribution. Unknown or not indicated nationality is excluded from calculation.`
   };
 }
 
@@ -1028,11 +972,9 @@ function formatMetaHtml(text, minAge, maxAge) {
     if (ageCoverageMatchesSelection(coverage, minAge, maxAge)) return match;
     return `<strong>${match}</strong>`;
   });
-  html = html.replace(/Includes official 100\+ age group \(no upper maximum published\)/g, "<strong>Includes official 100+ age group (no upper maximum published)</strong>");
-  html = html.replace(/85\+ \(no upper maximum published\)/g, "<strong>85+ (no upper maximum published)</strong>");
-  html = html.replace(/100\+ \(no upper maximum published\)/g, "<strong>100+ (no upper maximum published)</strong>");
   html = html.replace(/Whole-country population aged 15\+/g, "<strong>Whole-country population aged 15+</strong>");
   html = html.replace(/Whole-country ethnicity distribution/g, "<strong>Whole-country ethnicity distribution</strong>");
+  html = html.replace(/Unknown or not indicated nationality is excluded from calculation/g, "<strong>Unknown or not indicated nationality is excluded from calculation</strong>");
   return html;
 }
 
@@ -1133,12 +1075,8 @@ async function buildQuotas() {
         els.status.textContent = "Maximum age must be at least minimum age.";
         return;
       }
-      if (country === "LT" && maxAge > 99) {
-        els.status.textContent = "Lithuania is currently available up to age 99 in this calculator.";
-        return;
-      }
-      if (maxAge > OPEN_ENDED_AGE) {
-        els.status.textContent = "Maximum age must be 100+ or lower.";
+      if (maxAge > 99) {
+        els.status.textContent = "Maximum age must be 99 or lower.";
         return;
       }
     }

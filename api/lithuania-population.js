@@ -93,6 +93,7 @@ function parseLithuaniaNationalityXml(xml, year) {
   let total = 0;
   let lithuanian = 0;
   let russian = 0;
+  let unknown = 0;
   const obsPattern = /<g:Obs><g:ObsKey>([\s\S]*?)<\/g:ObsKey><g:ObsValue value="([^"]*)"/g;
   let match;
 
@@ -108,12 +109,13 @@ function parseLithuaniaNationalityXml(xml, year) {
     if (code === "TOT") total = population;
     if (code === "Lietuvis") lithuanian = population;
     if (code === "Rusas") russian = population;
+    if (code === "XXX") unknown = population;
   }
 
   return [
     { label: "Lithuanian", population: lithuanian },
     { label: "Russian", population: russian },
-    { label: "Other", population: Math.max(0, total - lithuanian - russian) }
+    { label: "Other", population: Math.max(0, total - lithuanian - russian - unknown) }
   ];
 }
 
@@ -284,7 +286,7 @@ export default async function handler(request, response) {
       educationRows,
       settlementRows,
       populationSourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${POPULATION_SOURCE_TITLE}, SDMX flow ${FLOW_ID}.`,
-      nationalitySourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${NATIONALITY_SOURCE_TITLE}, SDMX flow ${NATIONALITY_FLOW_ID}. Whole-country ethnicity distribution.`,
+      nationalitySourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${NATIONALITY_SOURCE_TITLE}, SDMX flow ${NATIONALITY_FLOW_ID}. Whole-country ethnicity distribution. Unknown or not indicated nationality is excluded from calculation.`,
       educationSourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${EDUCATION_SOURCE_TITLE}, SDMX flow ${EDUCATION_FLOW_ID}. Whole-country population aged 15+.`,
       settlementSourceNote: `State Data Agency of Lithuania / Official Statistics Portal: ${SETTLEMENT_URBAN_RURAL_SOURCE_TITLE}, SDMX flow ${URBAN_RURAL_FLOW_ID}; ${SETTLEMENT_CITY_SOURCE_TITLE}, SDMX flow ${CITY_TOWN_FLOW_ID}. Official age groups covering ages ${describeSettlementAgeCoverage(getSettlementAgeGroups(minAge, maxAge))}.`
     });
