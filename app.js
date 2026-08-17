@@ -1097,6 +1097,7 @@ function updateCustomAgeGroupsVisibility() {
   els.customAgeGroupsField.hidden = !isCustom;
   els.minAge.disabled = isCustom;
   els.maxAge.disabled = isCustom;
+  els.grouping.disabled = isCustom;
 }
 
 async function buildQuotas() {
