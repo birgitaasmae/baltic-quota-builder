@@ -1021,6 +1021,7 @@ function formatMetaHtml(text, minAge, maxAge) {
   html = html.replace(/Whole-country population aged 15\+/g, "<strong>Whole-country population aged 15+</strong>");
   html = html.replace(/Whole-country ethnicity distribution/g, "<strong>Whole-country ethnicity distribution</strong>");
   html = html.replace(/Unknown or not indicated nationality is excluded from calculation/g, "<strong>Unknown or not indicated nationality is excluded from calculation</strong>");
+  html = html.replace(/Settlement proportions are scaled to the selected exact population total/g, "<strong>Settlement proportions are scaled to the selected exact population total</strong>");
   return html;
 }
 
@@ -1039,6 +1040,16 @@ function addExportRows(section, headers, rows, footer = null, note = null) {
   state.rowsForExport.push(...rows);
   if (footer) state.rowsForExport.push(footer);
   state.rowsForExport.push([]);
+}
+
+function scaleRowsToTotal(rows, targetTotal) {
+  const total = rows.reduce((sum, row) => sum + row.population, 0);
+  if (!total || !targetTotal || total === targetTotal) return { rows, adjusted: false };
+  const scaledPopulations = largestRemainder(rows.map(row => row.population / total), targetTotal);
+  return {
+    rows: rows.map((row, index) => ({ ...row, population: scaledPopulations[index] })),
+    adjusted: true
+  };
 }
 
 function buildQuotaRows(labels, populations, sampleSize) {
@@ -1196,14 +1207,20 @@ async function buildQuotas() {
       els.settlementSection.hidden = true;
     } else if (settlement?.rows?.length) {
       const visibleSettlementRows = settlement.rows.filter(row => row.population > 0);
+      const scaledSettlement = scaleRowsToTotal(visibleSettlementRows, totalPopulation);
+      const settlementRowsForCalculation = scaledSettlement.rows;
       const settlementRowsForTable = buildQuotaRows(
-        visibleSettlementRows.map(row => row.label),
-        visibleSettlementRows.map(row => row.population),
+        settlementRowsForCalculation.map(row => row.label),
+        settlementRowsForCalculation.map(row => row.population),
         sampleSize
       );
-      const settlementTotal = visibleSettlementRows.reduce((sum, row) => sum + row.population, 0);
+      const settlementTotal = settlementRowsForCalculation.reduce((sum, row) => sum + row.population, 0);
       renderTable(els.settlementTable, ["Type of Settlement", "Population", "%", "Quota"], settlementRowsForTable, ["Total", fmt(settlementTotal), totalPercentString(), sampleSize]);
-      const settlementNote = sourceNote(country, year, settlement.sourceNote);
+      const settlementNote = sourceNote(
+        country,
+        year,
+        `${settlement.sourceNote}${scaledSettlement.adjusted ? " Settlement proportions are scaled to the selected exact population total." : ""}`
+      );
       setMeta(els.settlementMeta, settlementNote, minAge, maxAge);
       addExportRows("Type of Settlement Distribution", ["Type of Settlement", "Population", "%", "Quota"], settlementRowsForTable, ["Total", fmt(settlementTotal), totalPercentString(), sampleSize], settlementNote);
       els.settlementSection.hidden = false;
