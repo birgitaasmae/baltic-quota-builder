@@ -29,7 +29,7 @@ const COUNTY_LABELS = new Map([
 ]);
 
 const CAPITAL_CITY_CODE = "Vilnius";
-const BIG_CITY_CODES = new Set(["Kaunas", "Klaipeda", "Siauliai"]);
+const BIG_CITY_CODES = new Set(["Kaunas", "Klaipeda", "Siauliai", "Panevezys"]);
 const SETTLEMENT_AGE_GROUPS = [
   { cityCode: "g000g004", ruralCodes: ["g000g004"], from: 0, to: 4 },
   { cityCode: "g005g009", ruralCodes: ["g005g009"], from: 5, to: 9 },
@@ -202,7 +202,7 @@ function parseLithuaniaSettlementXml(urbanRuralXml, cityTownXml, year, minAge, m
 
   return [
     { label: "Capital (Vilnius)", population: capital },
-    { label: "Big cities (Kaunas, Klaipeda, Siauliai)", population: bigCities },
+    { label: "Big cities (Kaunas, Klaipeda, Siauliai, Panevezys)", population: bigCities },
     { label: "Other cities", population: Math.max(0, cityTotal - capital - bigCities) },
     { label: "Rural area", population: rural }
   ].filter(row => row.population > 0);
