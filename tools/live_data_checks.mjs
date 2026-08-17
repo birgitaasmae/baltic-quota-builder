@@ -394,26 +394,32 @@ async function checkLatviaSettlementNationalityEducation() {
   assertPositive(sum(latviaSettlementRows), "Latvia IRD081 settlement total");
   assertQuotaSum(latviaSettlementRows, 1000, "Latvia settlement quotas sum to sample size");
 
-  const nationalityData = await latviaPostSelection("IRE040", [
+  const nationalityData = await latviaPostSelection("IRE081", [
+    { variableCode: "SEX", valueCodes: ["T", "M", "F"] },
     { variableCode: "ETHNICITY", valueCodes: ["TOTAL", "E_LAT", "E_RUS", "OTH_NSP_UNK"] },
     { variableCode: "AgeGroup", valueCodes: ageGroups.map(group => group.code) },
-    { variableCode: "ContentsCode", valueCodes: ["IRE040"] },
+    { variableCode: "AREA", valueCodes: ["LV"] },
+    { variableCode: "ContentsCode", valueCodes: ["IRE081"] },
     { variableCode: "TIME", valueCodes: [year] }
   ]);
   const nationalityParsed = parseJsonStat(nationalityData);
-  const nationalityValue = code => sum(ageGroups.map(ageGroup => lookupValue(nationalityParsed, {
+  const nationalityValue = (sex, code) => sum(ageGroups.map(ageGroup => lookupValue(nationalityParsed, {
+    SEX: sex,
     ETHNICITY: code,
     AgeGroup: ageGroup.code,
-    ContentsCode: "IRE040",
+    AREA: "LV",
+    ContentsCode: "IRE081",
     TIME: year
   }) || 0));
-  const latvian = nationalityValue("E_LAT");
-  const russian = nationalityValue("E_RUS");
-  const nationalityTotal = nationalityValue("TOTAL");
-  const combinedOtherUnknown = nationalityValue("OTH_NSP_UNK");
-  assertPositive(nationalityTotal, "Latvia IRE040 nationality total");
+  const nationalityValueBothSexes = code => nationalityValue("M", code) + nationalityValue("F", code);
+  const latvian = nationalityValue("T", "E_LAT");
+  const russian = nationalityValue("T", "E_RUS");
+  const nationalityTotal = nationalityValue("T", "TOTAL");
+  const combinedOtherUnknown = nationalityValue("T", "OTH_NSP_UNK");
+  assertPositive(nationalityTotal, "Latvia IRE081 nationality total");
   assertEqual(latvian + russian + combinedOtherUnknown <= nationalityTotal, true, "Latvia nationality named groups plus combined other/unknown do not exceed total");
-  assertPositive(combinedOtherUnknown, "Latvia IRE040 combined other/not indicated total");
+  assertPositive(combinedOtherUnknown, "Latvia IRE081 combined other/not indicated total");
+  assertEqual(nationalityValueBothSexes("TOTAL"), nationalityTotal, "Latvia IRE081 male+female ethnicity total matches total sex");
   assertQuotaSum([latvian, russian], 1000, "Latvia nationality quotas sum to sample size after combined other/not indicated exclusion");
 
   const educationData = await latviaPostSelection("IZT010", [

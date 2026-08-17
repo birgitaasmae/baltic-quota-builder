@@ -15,7 +15,7 @@ const ESTONIA_NATIONALITY_TABLE_ID = "RV022U";
 const ESTONIA_EDUCATION_TABLE_ID = "RV0231U";
 const LATVIA_TABLE_ID = "IRD041";
 const LATVIA_NATIONALITY_TABLE_ID = "IRE010";
-const LATVIA_NATIONALITY_AGE_TABLE_ID = "IRE040";
+const LATVIA_NATIONALITY_AGE_TABLE_ID = "IRE081";
 const LATVIA_EDUCATION_TABLE_ID = "IZT010";
 const LITHUANIA_FLOW_ID = "S3R167_M3010202";
 const LITHUANIA_POPULATION_SOURCE_TITLE = "Resident population by sex and age at the beginning of the year";
@@ -677,26 +677,39 @@ async function fetchLatviaPopulation(year, minAge, maxAge) {
   };
 }
 
-async function fetchLatviaNationality(year, minAge, maxAge) {
+async function fetchLatviaNationality(year, minAge, maxAge, sexes) {
   const ageGroups = getLatviaSettlementAgeGroups(minAge, maxAge);
   if (!ageGroups.length) throw new Error("No Latvia nationality age groups found for this selection.");
+  const sexCodes = sexes.length === 2 ? ["T"] : sexes;
   const data = await latviaPostSelection(LATVIA_NATIONALITY_AGE_TABLE_ID, [
+    { variableCode: "SEX", valueCodes: sexCodes },
     { variableCode: "ETHNICITY", valueCodes: ["TOTAL", "E_LAT", "E_RUS", "OTH_NSP_UNK"] },
     { variableCode: "AgeGroup", valueCodes: ageGroups.map(group => group.code) },
+    { variableCode: "AREA", valueCodes: ["LV"] },
     { variableCode: "ContentsCode", valueCodes: [LATVIA_NATIONALITY_AGE_TABLE_ID] },
     { variableCode: "TIME", valueCodes: [year] }
   ]);
   const parsed = parseJsonStat(data);
-  const valueFor = code => ageGroups.reduce((sum, ageGroup) => sum + (lookupValue(parsed, {
-    ETHNICITY: code,
-    AgeGroup: ageGroup.code,
-    ContentsCode: LATVIA_NATIONALITY_AGE_TABLE_ID,
-    TIME: year
-  }) || 0), 0);
+  const valueFor = code => {
+    let total = 0;
+    for (const sexCode of sexCodes) {
+      for (const ageGroup of ageGroups) {
+        total += lookupValue(parsed, {
+          SEX: sexCode,
+          ETHNICITY: code,
+          AgeGroup: ageGroup.code,
+          AREA: "LV",
+          ContentsCode: LATVIA_NATIONALITY_AGE_TABLE_ID,
+          TIME: year
+        }) || 0;
+      }
+    }
+    return total;
+  };
   return {
     rows: ethnicityRows("Latvian", "Russian", "Other", valueFor("E_LAT"), valueFor("E_RUS"), valueFor("TOTAL"), valueFor("OTH_NSP_UNK")),
     sourceNote: nationalitySourceNoteWithExclusion(
-      `Central Statistics Bureau of Latvia table IRE040. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`,
+      `Central Statistics Bureau of Latvia table IRE081. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`,
       "Latvia CSB combines other ethnicities with not selected/not indicated ethnicity in this table, so that combined category is excluded."
     )
   };
@@ -889,7 +902,7 @@ async function fetchPopulation(country, year, minAge, maxAge, grouping) {
 
 async function fetchNationality(country, year, minAge, maxAge, sexes) {
   if (country === "EE") return fetchEstoniaNationality(year, minAge, maxAge, sexes);
-  if (country === "LV") return fetchLatviaNationality(year, minAge, maxAge);
+  if (country === "LV") return fetchLatviaNationality(year, minAge, maxAge, sexes);
   return fetchLithuaniaNationality(year);
 }
 
