@@ -35,6 +35,7 @@
           <label class="field">
             <span>Year</span>
             <select id="yearSelect">
+              <option value="2026">2026</option>
               <option value="2025">2025</option>
               <option value="2024">2024</option>
               <option value="2023">2023</option>
@@ -50,12 +51,12 @@
 
           <label class="field">
             <span>Minimum Age</span>
-            <input id="minAgeInput" type="number" min="0" max="99" value="18">
+            <input id="minAgeInput" type="number" min="0" max="100" value="18">
           </label>
 
           <label class="field">
-            <span>Maximum Age (up to 99)</span>
-            <input id="maxAgeInput" type="number" min="0" max="99" value="74">
+            <span>Maximum Age (100+ where published)</span>
+            <input id="maxAgeInput" type="number" min="0" max="100" value="74">
           </label>
 
           <label class="field">
@@ -188,6 +189,6 @@
       </section>
     </main>
 
-    <script type="module" src="app.js?v=feature-toggle-on-off-1"></script>
+    <script type="module" src="app.js?v=open-ended-100-plus-1"></script>
   </body>
 </html>

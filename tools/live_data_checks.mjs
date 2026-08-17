@@ -1,6 +1,7 @@
 const ESTONIA_API_BASE = "https://andmed.stat.ee/api/v1/et/stat";
 const LATVIA_API_BASE = "https://api.stat.gov.lv/api/v2";
 const LITHUANIA_PROXY_URL = "https://baltic-quota-builder.vercel.app/api/lithuania-population";
+const OPEN_ENDED_AGE_KEY = "100+";
 
 const ESTONIA_REGION_QUERY_CODES = ["37", "784", "39", "44", "49", "51", "57", "59", "65", "67", "70", "74", "78", "82", "84", "86"];
 const ESTONIA_REGION_CODES = ["784", "37_NO_TALLINN", "39", "44", "49", "51", "57", "59", "65", "67", "70", "74", "78", "82", "84", "86"];
@@ -122,7 +123,7 @@ function estoniaEducationAgeGroups(minAge, maxAge) {
     { code: "13", from: 70, to: 74 },
     { code: "14", from: 75, to: 79 },
     { code: "15", from: 80, to: 84 },
-    { code: "16", from: 85, to: 99 }
+    { code: "16", from: 85, to: 100 }
   ].filter(group => group.to >= minAge && group.from <= maxAge);
 }
 
@@ -145,7 +146,7 @@ function latviaGroupedAges(minAge, maxAge) {
     { code: "Y70-74", from: 70, to: 74 },
     { code: "Y75-79", from: 75, to: 79 },
     { code: "Y80-84", from: 80, to: 84 },
-    { code: "Y_GE85", from: 85, to: 99 }
+    { code: "Y_GE85", from: 85, to: 100 }
   ].filter(group => group.to >= minAge && group.from <= maxAge);
 }
 
@@ -342,6 +343,48 @@ async function checkLatviaIrd041() {
   return `Latvia IRD041 ${year} ages ${minAge}-${maxAge}: total ${national}`;
 }
 
+async function checkLatviaIrd041With100Plus() {
+  const year = "2026";
+  const ageCodes = [];
+  for (let age = 0; age <= 99; age++) ageCodes.push(exactAgeCode(age));
+  ageCodes.push("Y_GE100");
+  const data = await latviaPostSelection("IRD041", [
+    { variableCode: "ContentsCode", valueCodes: ["IRD041"] },
+    { variableCode: "TIME", valueCodes: [year] },
+    { variableCode: "AREA", valueCodes: ["LV"] },
+    { variableCode: "SEX", valueCodes: ["M", "F"] },
+    { variableCode: "AGE", valueCodes: ageCodes }
+  ]);
+  const parsed = parseJsonStat(data);
+  const valueFor = (sex, ageCode) => lookupValue(parsed, {
+    AREA: "LV",
+    AGE: ageCode,
+    SEX: sex,
+    ContentsCode: "IRD041",
+    TIME: year
+  }) || 0;
+  const rows = new Map();
+  for (const sex of ["M", "F"]) {
+    for (let age = 0; age <= 99; age++) rows.set(`${sex}|${age}`, valueFor(sex, exactAgeCode(age)));
+    rows.set(`${sex}|${OPEN_ENDED_AGE_KEY}`, valueFor(sex, "Y_GE100"));
+  }
+  const male = [...rows.entries()].filter(([key]) => key.startsWith("M|")).reduce((total, [, value]) => total + value, 0);
+  const female = [...rows.entries()].filter(([key]) => key.startsWith("F|")).reduce((total, [, value]) => total + value, 0);
+  const total = male + female;
+  const children = ["M", "F"].reduce((subtotal, sex) => subtotal + Array.from({ length: 15 }, (_, age) => rows.get(`${sex}|${age}`) || 0).reduce((a, b) => a + b, 0), 0);
+  const working = ["M", "F"].reduce((subtotal, sex) => subtotal + Array.from({ length: 50 }, (_, offset) => rows.get(`${sex}|${offset + 15}`) || 0).reduce((a, b) => a + b, 0), 0);
+  const seniors = total - children - working;
+  assertEqual(total, 1845096, "Latvia IRD041 2026 total including 100+");
+  assertEqual(male, 856599, "Latvia IRD041 2026 male including 100+");
+  assertEqual(female, 988497, "Latvia IRD041 2026 female including 100+");
+  assertEqual(rows.get(`M|${OPEN_ENDED_AGE_KEY}`), 31, "Latvia IRD041 2026 male 100+");
+  assertEqual(rows.get(`F|${OPEN_ENDED_AGE_KEY}`), 226, "Latvia IRD041 2026 female 100+");
+  assertEqual(children, 273963, "Latvia IRD041 2026 ages 0-14");
+  assertEqual(working, 1158166, "Latvia IRD041 2026 ages 15-64");
+  assertEqual(seniors, 412967, "Latvia IRD041 2026 ages 65+ including 100+");
+  return `Latvia IRD041 ${year} includes official 100+ bucket and matches infographic totals`;
+}
+
 async function checkLatviaSettlementNationalityEducation() {
   const year = "2025";
   const minAge = 18;
@@ -515,6 +558,7 @@ async function main() {
     checkEstoniaRv0240,
     checkEstoniaSettlementNationalityEducation,
     checkLatviaIrd041,
+    checkLatviaIrd041With100Plus,
     checkLatviaSettlementNationalityEducation,
     checkLithuaniaProxy,
     checkLithuaniaEducationLatestAvailable,
