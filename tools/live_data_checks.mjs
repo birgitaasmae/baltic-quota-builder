@@ -475,14 +475,14 @@ async function checkLithuaniaProxy() {
 
   const settlement = new Map(data.settlementRows.map(row => [row.label, row.population]));
   assertEqual(settlement.get("Capital (Vilnius)"), 464347, "Lithuania settlement Capital (Vilnius), official age coverage");
-  assertEqual(settlement.get("Big cities (Kaunas, Klaipeda, Siauliai, Panevezys)"), 498887, "Lithuania settlement big cities excluding Vilnius");
-  assertEqual(settlement.get("Other cities"), 546114, "Lithuania settlement other cities");
+  assertEqual(settlement.get("Big cities (Kaunas, Klaipeda, Siauliai)"), 435083, "Lithuania settlement big cities excluding Vilnius and Panevezys");
+  assertEqual(settlement.get("Other cities"), 609918, "Lithuania settlement other cities including Panevezys");
   assertEqual(settlement.get("Rural area"), 704883, "Lithuania settlement rural area");
   assertNear(sum([...settlement.values()]), 2214231, 0, "Lithuania settlement total for official age coverage");
   assertEqual(
-    settlement.get("Capital (Vilnius)") + settlement.get("Big cities (Kaunas, Klaipeda, Siauliai, Panevezys)"),
-    963234,
-    "Lithuania Vilnius plus other big cities"
+    settlement.get("Capital (Vilnius)") + settlement.get("Big cities (Kaunas, Klaipeda, Siauliai)"),
+    899430,
+    "Lithuania Vilnius plus selected big cities"
   );
   assertQuotaSum(regionalTotals, 3000, "Lithuania regional quotas sum to sample size");
   assertQuotaSum([...settlement.values()], 3000, "Lithuania settlement quotas sum to sample size");

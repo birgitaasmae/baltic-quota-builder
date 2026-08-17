@@ -119,6 +119,9 @@ const els = {
   nationalitySection: document.querySelector("#nationalitySection"),
   nationalityTable: document.querySelector("#nationalityTable"),
   nationalityMeta: document.querySelector("#nationalityMeta"),
+  nationalityCrossSection: document.querySelector("#nationalityCrossSection"),
+  nationalityCrossTable: document.querySelector("#nationalityCrossTable"),
+  nationalityCrossMeta: document.querySelector("#nationalityCrossMeta"),
   educationSection: document.querySelector("#educationSection"),
   educationTable: document.querySelector("#educationTable"),
   educationMeta: document.querySelector("#educationMeta"),
@@ -140,6 +143,10 @@ function ethnicityRows(nativeLabel, russianLabel, otherLabel, nativePopulation, 
     { label: russianLabel, population: russian },
     { label: otherLabel, population: Math.max(0, total - native - russian - unknown) }
   ].filter(row => row.population > 0);
+}
+
+function ethnicityRowsFromValues(nativeLabel, russianLabel, otherLabel, values) {
+  return ethnicityRows(nativeLabel, russianLabel, otherLabel, values.native, values.russian, values.total, values.unknown);
 }
 
 function nationalitySourceNoteWithExclusion(sourceNote, extra = "") {
@@ -541,10 +548,10 @@ async function fetchEstoniaNationality(year, minAge, maxAge, sexes) {
     { code: "Rahvus", selection: { filter: "item", values: ["1", "2", "3", "6"] } }
   ]);
   const parsed = parseJsonStat(data);
-  const valueFor = code => {
+  const valueFor = (code, selectedSexCodes = sexCodes) => {
     let total = 0;
     for (const ageGroup of ageGroups) {
-      for (const sexCode of sexCodes) {
+      for (const sexCode of selectedSexCodes) {
         total += lookupValue(parsed, {
           Aasta: year,
           [ageGroupCode]: ageGroup.code,
@@ -556,8 +563,21 @@ async function fetchEstoniaNationality(year, minAge, maxAge, sexes) {
     }
     return total;
   };
+  const valuesForSexCodes = selectedSexCodes => ({
+    native: valueFor("2", selectedSexCodes),
+    russian: valueFor("3", selectedSexCodes),
+    total: valueFor("1", selectedSexCodes),
+    unknown: valueFor("6", selectedSexCodes)
+  });
+  const crossRows = sexes.length === 2
+    ? {
+      M: ethnicityRowsFromValues("Estonian", "Russian", "Other", valuesForSexCodes(["2"])),
+      F: ethnicityRowsFromValues("Estonian", "Russian", "Other", valuesForSexCodes(["3"]))
+    }
+    : null;
   return {
-    rows: ethnicityRows("Estonian", "Russian", "Other", valueFor("2"), valueFor("3"), valueFor("1"), valueFor("6")),
+    rows: ethnicityRowsFromValues("Estonian", "Russian", "Other", valuesForSexCodes(sexCodes)),
+    crossRows,
     sourceNote: nationalitySourceNoteWithExclusion(`Statistics Estonia table RV022U. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`)
   };
 }
@@ -690,9 +710,9 @@ async function fetchLatviaNationality(year, minAge, maxAge, sexes) {
     { variableCode: "TIME", valueCodes: [year] }
   ]);
   const parsed = parseJsonStat(data);
-  const valueFor = code => {
+  const valueFor = (code, selectedSexCodes = sexCodes) => {
     let total = 0;
-    for (const sexCode of sexCodes) {
+    for (const sexCode of selectedSexCodes) {
       for (const ageGroup of ageGroups) {
         total += lookupValue(parsed, {
           SEX: sexCode,
@@ -706,8 +726,21 @@ async function fetchLatviaNationality(year, minAge, maxAge, sexes) {
     }
     return total;
   };
+  const valuesForSexCodes = selectedSexCodes => ({
+    native: valueFor("E_LAT", selectedSexCodes),
+    russian: valueFor("E_RUS", selectedSexCodes),
+    total: valueFor("TOTAL", selectedSexCodes),
+    unknown: valueFor("OTH_NSP_UNK", selectedSexCodes)
+  });
+  const crossRows = sexes.length === 2
+    ? {
+      M: ethnicityRowsFromValues("Latvian", "Russian", "Other", valuesForSexCodes(["M"])),
+      F: ethnicityRowsFromValues("Latvian", "Russian", "Other", valuesForSexCodes(["F"]))
+    }
+    : null;
   return {
-    rows: ethnicityRows("Latvian", "Russian", "Other", valueFor("E_LAT"), valueFor("E_RUS"), valueFor("TOTAL"), valueFor("OTH_NSP_UNK")),
+    rows: ethnicityRowsFromValues("Latvian", "Russian", "Other", valuesForSexCodes(sexCodes)),
+    crossRows,
     sourceNote: nationalitySourceNoteWithExclusion(
       `Central Statistics Bureau of Latvia table IRE081. Official age groups covering ages ${describeAgeGroupCoverage(ageGroups)}.`,
       "Latvia CSB combines other ethnicities with not selected/not indicated ethnicity in this table, so that combined category is excluded."
@@ -1192,8 +1225,48 @@ async function buildQuotas() {
       setMeta(els.nationalityMeta, nationalityNote, minAge, maxAge);
       addExportRows("Nationality Distribution", ["Nationality", "Population", "%", "Quota"], nationalityRows, ["Total", fmt(nationalityTotal), totalPercentString(), sampleSize], nationalityNote);
       els.nationalitySection.hidden = false;
+
+      if (sexes.length === 2 && nationality.crossRows?.M?.length && nationality.crossRows?.F?.length) {
+        const nationalityLabels = nationality.rows.map(row => row.label);
+        const crossPopulations = nationalityLabels.flatMap(label => sexes.map(sex => (
+          nationality.crossRows[sex].find(row => row.label === label)?.population || 0
+        )));
+        const crossTotal = crossPopulations.reduce((sum, value) => sum + value, 0);
+        const crossQuotas = largestRemainder(crossPopulations.map(value => value / crossTotal), sampleSize);
+        const crossPercentages = percentageStrings(crossPopulations);
+        const crossRows = nationalityLabels.map((label, labelIndex) => {
+          const cells = [label];
+          sexes.forEach((sex, sexIndex) => {
+            const index = labelIndex * sexes.length + sexIndex;
+            cells.push(fmt(crossPopulations[index]), crossPercentages[index], crossQuotas[index]);
+          });
+          return cells;
+        });
+        const crossHeaders = ["Nationality", ...sexes.flatMap(sex => {
+          const label = sex === "M" ? "Male" : "Female";
+          return [`${label} Population`, `${label} %`, `${label} Quota`];
+        })];
+        const crossFooter = ["Total"];
+        sexes.forEach((sex, sexIndex) => {
+          const population = nationalityLabels.reduce((sum, _label, labelIndex) => sum + crossPopulations[labelIndex * sexes.length + sexIndex], 0);
+          const percentUnits = nationalityLabels.reduce((sum, _label, labelIndex) => {
+            const percent = crossPercentages[labelIndex * sexes.length + sexIndex];
+            return sum + Math.round(Number(percent.replace("%", "")) * (10 ** PERCENT_DECIMALS));
+          }, 0);
+          const quota = nationalityLabels.reduce((sum, _label, labelIndex) => sum + crossQuotas[labelIndex * sexes.length + sexIndex], 0);
+          crossFooter.push(fmt(population), formatPercentUnits(percentUnits), quota);
+        });
+        renderTable(els.nationalityCrossTable, crossHeaders, crossRows, crossFooter);
+        const nationalityCrossNote = `${nationalityNote}; shown as a sex by nationality cross table.`;
+        setMeta(els.nationalityCrossMeta, nationalityCrossNote, minAge, maxAge);
+        addExportRows("Sex x Nationality Cross Table", crossHeaders, crossRows, crossFooter, nationalityCrossNote);
+        els.nationalityCrossSection.hidden = false;
+      } else {
+        els.nationalityCrossSection.hidden = true;
+      }
     } else {
       els.nationalitySection.hidden = true;
+      els.nationalityCrossSection.hidden = true;
     }
 
     if (educationLevel <= 0) {
