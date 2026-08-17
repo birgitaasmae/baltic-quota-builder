@@ -156,7 +156,8 @@ textarea {
   font-weight: 400;
 }
 
-input:disabled {
+input:disabled,
+select:disabled {
   color: #77736b;
   background: var(--surface);
 }
